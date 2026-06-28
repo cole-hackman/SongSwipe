@@ -38,3 +38,5 @@ test/screenshots
 .venv
 __pycache__/
 *.pyc
+sidecar/build/
+sidecar/dist/

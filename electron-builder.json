@@ -12,19 +12,29 @@
   ],
   "extraResources": [
     {
-      "from": "sidecar",
-      "to": "sidecar",
-      "filter": ["**/*"]
+      "from": "sidecar/dist/rb-bridge",
+      "to": "rb-bridge"
     },
     {
-      "from": ".venv",
-      "to": "sidecar-venv",
-      "filter": ["**/*"]
+      "from": "sidecar",
+      "to": "sidecar",
+      "filter": ["rb_bridge.py", "commands.py", "requirements.txt"]
     }
   ],
   "mac": {
     "artifactName": "${productName}_${version}.${ext}",
-    "target": ["dmg", "zip"]
+    "target": ["dmg", "zip"],
+    "extraResources": [
+      {
+        "from": "sidecar/dist/rb-bridge",
+        "to": "rb-bridge"
+      },
+      {
+        "from": "sidecar",
+        "to": "sidecar",
+        "filter": ["rb_bridge.py", "commands.py", "requirements.txt"]
+      }
+    ]
   },
   "win": {
     "target": [
@@ -33,7 +43,18 @@
         "arch": ["x64"]
       }
     ],
-    "artifactName": "${productName}_${version}.${ext}"
+    "artifactName": "${productName}_${version}.${ext}",
+    "extraResources": [
+      {
+        "from": "sidecar/dist/rb-bridge.exe",
+        "to": "rb-bridge.exe"
+      },
+      {
+        "from": "sidecar",
+        "to": "sidecar",
+        "filter": ["rb_bridge.py", "commands.py", "requirements.txt"]
+      }
+    ]
   },
   "nsis": {
     "oneClick": false,

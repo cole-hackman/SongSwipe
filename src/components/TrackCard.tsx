@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { Track } from '@/lib/types'
+import { getArtworkUrl } from '@/audio/artwork-cache'
 import { toMediaUrl } from '@/lib/ipc'
+import { useQueueStore } from '@/store/queue'
+import { PlaylistMembershipBadges } from '@/components/PlaylistMembershipBadges'
 
 type TrackCardProps = {
   track: Track
@@ -8,22 +11,13 @@ type TrackCardProps = {
 
 export function TrackCard({ track }: TrackCardProps) {
   const [artUrl, setArtUrl] = useState<string | null>(null)
+  const membership = useQueueStore((s) => s.membershipByTrackId[track.id])
 
   useEffect(() => {
     let active = true
-    async function loadArt() {
-      if (!track.artworkPath) {
-        setArtUrl(null)
-        return
-      }
-      try {
-        const url = await toMediaUrl(track.artworkPath)
-        if (active) setArtUrl(url)
-      } catch {
-        if (active) setArtUrl(null)
-      }
-    }
-    void loadArt()
+    void getArtworkUrl(track.artworkPath, toMediaUrl).then((url) => {
+      if (active) setArtUrl(url)
+    })
     return () => {
       active = false
     }
@@ -37,6 +31,10 @@ export function TrackCard({ track }: TrackCardProps) {
         <div className="track-card__art" aria-hidden />
       )}
       <div>
+        <PlaylistMembershipBadges
+          inDest={membership?.inDest ?? false}
+          inCull={membership?.inCull ?? false}
+        />
         <h2 className="track-card__title">{track.title || 'Untitled'}</h2>
         <p className="track-card__artist">{track.artist || 'Unknown artist'}</p>
         <div className="track-card__meta">

@@ -8,7 +8,8 @@
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder",
+    "build:sidecar": "cd sidecar && ../.venv/bin/pip install pyinstaller -q && ../.venv/bin/pyinstaller build.spec --noconfirm --clean",
+    "build": "npm run build:sidecar && vite build && electron-builder",
     "preview": "vite preview",
     "test": "vitest run",
     "test:sidecar": ".venv/bin/pytest sidecar/tests -q",
@@ -19,6 +20,7 @@
     "@fontsource/bricolage-grotesque": "^5.2.10",
     "@fontsource/hanken-grotesk": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
+    "@react-spring/web": "^9.7.5",
     "@wavesurfer/react": "^1.0.12",
     "react-tinder-card": "^1.6.4",
     "wavesurfer.js": "^7.12.8",

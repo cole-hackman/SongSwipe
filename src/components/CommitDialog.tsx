@@ -1,12 +1,20 @@
-import { useMemo, useState } from 'react'
-import { rb } from '@/lib/ipc'
+import { useMemo, useState, useEffect } from 'react'
+import { exportTextFile, rb } from '@/lib/ipc'
 import type { TrackDecision } from '@/lib/types'
+import { ReviewQueue } from '@/components/ReviewQueue'
 import { useDecisionsStore } from '@/store/decisions'
 import { useSettingsStore } from '@/store/settings'
 
 type CommitDialogProps = {
   open: boolean
   onClose: () => void
+}
+
+type PlannedOperation = Record<string, unknown>
+
+type BackupEntry = {
+  path: string
+  createdAt: string
 }
 
 export function CommitDialog({ open, onClose }: CommitDialogProps) {
@@ -16,12 +24,86 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
   const cullPlaylistId = useSettingsStore((s) => s.cullPlaylistId)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
+  const [dryRun, setDryRun] = useState<PlannedOperation[]>([])
+  const [backups, setBackups] = useState<BackupEntry[]>([])
 
   const summary = useMemo(() => summarize(decisions), [decisions])
+  const keepBlocked = Object.entries(decisions).some(
+    ([, decision]) => decision.keep && !(decision.destPlaylistId ?? destinationPlaylistId),
+  )
+
+  useEffect(() => {
+    if (!open) return
+    void rb<BackupEntry[]>('list_backups').then(setBackups).catch(() => setBackups([]))
+  }, [open])
 
   if (!open) return null
 
+  function decisionPayload() {
+    return Object.entries(decisions).map(([trackId, decision]) => ({ trackId, ...decision }))
+  }
+
+  async function runDryRun() {
+    setBusy(true)
+    setStatus(null)
+    try {
+      const plan = await rb<{ operations: PlannedOperation[] }>('plan_commit', {
+        decisions: decisionPayload(),
+        defaultDestId: destinationPlaylistId,
+        defaultCullId: cullPlaylistId,
+      })
+      setDryRun(plan.operations)
+      setStatus(`Dry-run: ${plan.operations.length} operation(s) planned.`)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Dry-run failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function exportXml() {
+    setBusy(true)
+    setStatus(null)
+    try {
+      const result = await rb<{ xml: string }>('export_commit_xml', {
+        decisions: decisionPayload(),
+        defaultDestId: destinationPlaylistId,
+        defaultCullId: cullPlaylistId,
+      })
+      const saved = await exportTextFile('songswipe-commit.xml', result.xml, [
+        { name: 'XML', extensions: ['xml'] },
+      ])
+      setStatus(saved ? `XML saved to ${saved}` : 'XML export cancelled.')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'XML export failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function rollback(backupPath: string) {
+    if (!window.confirm('Restore this backup over master.db? Rekordbox must be closed.')) return
+    setBusy(true)
+    setStatus(null)
+    try {
+      await rb('restore_backup', { backupPath })
+      setStatus(`Restored from ${backupPath}`)
+      const next = await rb<BackupEntry[]>('list_backups')
+      setBackups(next)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Restore failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function commit() {
+    if (keepBlocked) {
+      setStatus('Every keep decision needs a destination playlist.')
+      return
+    }
+
     setBusy(true)
     setStatus(null)
     try {
@@ -44,8 +126,11 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
           if (decision.colorId != null) {
             await rb('set_color', { trackId, colorId: decision.colorId })
           }
-          if (decision.keep && destinationPlaylistId) {
-            await rb('add_to_playlist', { playlistId: destinationPlaylistId, trackId })
+          if (decision.keep) {
+            const destId = decision.destPlaylistId ?? destinationPlaylistId
+            if (destId) {
+              await rb('add_to_playlist', { playlistId: destId, trackId })
+            }
           }
           if (!decision.keep && cullPlaylistId) {
             await rb('add_to_playlist', { playlistId: cullPlaylistId, trackId })
@@ -58,12 +143,18 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
         }
       }
 
+      await rb('close_db')
+
       clearCommitted(committed)
       if (failures.length) {
         setStatus(`Committed ${committed.length} tracks. ${failures.length} failed.`)
       } else {
         setStatus(`Committed ${committed.length} tracks successfully.`)
       }
+      setReviewing(false)
+      setDryRun([])
+      const next = await rb<BackupEntry[]>('list_backups')
+      setBackups(next)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Commit failed')
     } finally {
@@ -73,19 +164,69 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--wide" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2>Commit to Rekordbox</h2>
         <p>
           {summary.keepCount} keep, {summary.cullCount} cull, {summary.ratingCount} ratings,{' '}
           {summary.colorCount} colors.
         </p>
+        {keepBlocked ? (
+          <p className="top-bar__meta">
+            Select a keep playlist (default or per-track) before committing.
+          </p>
+        ) : null}
+        {reviewing ? <ReviewQueue onClose={() => setReviewing(false)} /> : null}
+        {dryRun.length ? (
+          <div className="dry-run">
+            <h3>Dry-run preview</h3>
+            <ul>
+              {dryRun.map((op, index) => (
+                <li key={`${String(op.type)}-${index}`}>
+                  {String(op.type)} — {String(op.trackId)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {backups.length ? (
+          <div className="backup-list">
+            <h3>Restore backup</h3>
+            {backups.slice(0, 3).map((backup) => (
+              <button
+                key={backup.path}
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => void rollback(backup.path)}
+              >
+                {backup.createdAt}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {status ? <p>{status}</p> : null}
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
             Close
           </button>
-          <button type="button" className="btn btn--primary" onClick={() => void commit()} disabled={busy}>
-            {busy ? 'Committing…' : 'Commit'}
+          {!reviewing ? (
+            <button type="button" className="btn" onClick={() => setReviewing(true)} disabled={busy}>
+              Review changes
+            </button>
+          ) : null}
+          <button type="button" className="btn" onClick={() => void runDryRun()} disabled={busy}>
+            Dry-run
+          </button>
+          <button type="button" className="btn" onClick={() => void exportXml()} disabled={busy}>
+            Export XML
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => void commit()}
+            disabled={busy || keepBlocked}
+          >
+            {busy ? 'Committing…' : 'Commit to Rekordbox'}
           </button>
         </div>
       </div>

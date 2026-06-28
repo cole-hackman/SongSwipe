@@ -1,11 +1,39 @@
 import { create } from 'zustand'
-import type { Cue, Playlist, Track } from '@/lib/types'
-import { rb } from '@/lib/ipc'
+import type { Cue, Playlist, Track, TrackMembership } from '@/lib/types'
+import { batchFileExists, rb } from '@/lib/ipc'
+import { useSettingsStore } from '@/store/settings'
+
+type BundleTrack = Track & { cues?: Cue[] }
+
+async function enrichPlaylist(tracks: Track[]) {
+  const { destinationPlaylistId, cullPlaylistId } = useSettingsStore.getState()
+  const playlistIds = [destinationPlaylistId, cullPlaylistId].filter(Boolean) as string[]
+  const paths = tracks.map((t) => t.path).filter(Boolean)
+
+  const [existsMap, membership] = await Promise.all([
+    paths.length ? batchFileExists(paths) : Promise.resolve({} as Record<string, boolean>),
+    playlistIds.length
+      ? rb<Record<string, string[]>>('get_playlist_membership', { playlistIds })
+      : Promise.resolve({} as Record<string, string[]>),
+  ])
+
+  const missingPaths = paths.filter((p) => !existsMap[p])
+  const destSet = new Set(membership[destinationPlaylistId ?? ''] ?? [])
+  const cullSet = new Set(membership[cullPlaylistId ?? ''] ?? [])
+  const membershipByTrackId: Record<string, TrackMembership> = {}
+  for (const t of tracks) {
+    membershipByTrackId[t.id] = { inDest: destSet.has(t.id), inCull: cullSet.has(t.id) }
+  }
+  useQueueStore.setState({ missingPaths, membershipByTrackId })
+}
 
 type QueueState = {
   playlists: Playlist[]
   tracks: Track[]
   cues: Cue[]
+  cuesByTrackId: Record<string, Cue[]>
+  missingPaths: string[]
+  membershipByTrackId: Record<string, TrackMembership>
   currentIndex: number
   loading: boolean
   error: string | null
@@ -23,6 +51,9 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   playlists: [],
   tracks: [],
   cues: [],
+  cuesByTrackId: {},
+  missingPaths: [],
+  membershipByTrackId: {},
   currentIndex: 0,
   loading: false,
   error: null,
@@ -42,11 +73,34 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   },
 
   async selectPlaylist(playlistId) {
-    set({ loading: true, error: null, sourcePlaylistId: playlistId })
+    set({
+      loading: true,
+      error: null,
+      sourcePlaylistId: playlistId,
+      cuesByTrackId: {},
+      missingPaths: [],
+      membershipByTrackId: {},
+    })
     try {
-      const tracks = await rb<Track[]>('get_tracks', { playlistId })
-      set({ tracks, currentIndex: 0, loading: false })
-      await get().loadCuesForCurrent()
+      const bundle = await rb<{ tracks: BundleTrack[] }>('get_playlist_bundle', {
+        playlistId,
+        includeCues: true,
+      })
+      const cuesByTrackId: Record<string, Cue[]> = {}
+      const tracks: Track[] = []
+      for (const { cues, ...track } of bundle.tracks) {
+        tracks.push(track)
+        if (cues?.length) cuesByTrackId[track.id] = cues
+      }
+      const firstId = tracks[0]?.id
+      set({
+        tracks,
+        currentIndex: 0,
+        cuesByTrackId,
+        cues: firstId ? (cuesByTrackId[firstId] ?? []) : [],
+        loading: false,
+      })
+      void enrichPlaylist(tracks)
     } catch (error) {
       set({
         loading: false,
@@ -61,9 +115,14 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       set({ cues: [] })
       return
     }
+    const cached = get().cuesByTrackId[track.id]
+    if (cached) {
+      set({ cues: cached })
+      return
+    }
     try {
       const cues = await rb<Cue[]>('get_cues', { trackId: track.id })
-      set({ cues })
+      set({ cues, cuesByTrackId: { ...get().cuesByTrackId, [track.id]: cues } })
     } catch {
       set({ cues: [] })
     }

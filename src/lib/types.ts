@@ -3,6 +3,8 @@ export type Playlist = {
   name: string
   parentId: string | null
   isFolder: boolean
+  isSmart?: boolean
+  sortIndex?: number
 }
 
 export type Track = {
@@ -17,6 +19,38 @@ export type Track = {
   colorId: number
   durationSec: number
   artworkPath: string | null
+  comment?: string
+  playCount?: number
+  dateAdded?: string | null
+  lastPlayed?: string | null
+}
+
+export type BeatMarker = {
+  positionSec: number
+  bpm: number | null
+  beatInBar: number
+}
+
+export type DuplicateCluster = {
+  key: string
+  trackIds: string[]
+  reason: 'path' | 'metadata'
+}
+
+export type TrackMembership = {
+  inDest: boolean
+  inCull: boolean
+}
+
+export type SessionMode = 'triage' | 'audit' | 'compare'
+
+export type BatchRule = {
+  id: string
+  enabled: boolean
+  field: 'bpm' | 'rating' | 'key'
+  op: 'lt' | 'gt' | 'eq' | 'empty'
+  value?: string | number
+  action: 'suggest_keep' | 'suggest_cull'
 }
 
 export type Cue = {

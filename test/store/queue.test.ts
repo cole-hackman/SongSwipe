@@ -3,6 +3,7 @@ import { useQueueStore } from '@/store/queue'
 
 vi.mock('@/lib/ipc', () => ({
   rb: vi.fn(),
+  batchFileExists: vi.fn(async () => ({})),
 }))
 
 import { rb } from '@/lib/ipc'
@@ -13,6 +14,9 @@ describe('queue store', () => {
       playlists: [],
       tracks: [],
       cues: [],
+      cuesByTrackId: {},
+      missingPaths: [],
+      membershipByTrackId: {},
       currentIndex: 0,
       loading: false,
       error: null,
@@ -23,10 +27,26 @@ describe('queue store', () => {
 
   it('loads tracks for a playlist', async () => {
     vi.mocked(rb).mockImplementation(async (method) => {
-      if (method === 'get_tracks') {
-        return [{ id: '1', path: '/a.mp3', title: 'A', artist: '', album: '', bpm: null, key: '', rating: 0, colorId: 0, durationSec: 0, artworkPath: null }]
+      if (method === 'get_playlist_bundle') {
+        return {
+          tracks: [
+            {
+              id: '1',
+              path: '/a.mp3',
+              title: 'A',
+              artist: '',
+              album: '',
+              bpm: null,
+              key: '',
+              rating: 0,
+              colorId: 0,
+              durationSec: 0,
+              artworkPath: null,
+              cues: [],
+            },
+          ],
+        }
       }
-      if (method === 'get_cues') return []
       return []
     })
 

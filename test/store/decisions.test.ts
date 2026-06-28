@@ -8,9 +8,10 @@ describe('decisions store', () => {
 
   it('decides and undoes a track decision', () => {
     const { decide, undo, getForTrack } = useDecisionsStore.getState()
-    decide('track-1', { keep: true, rating: 4 })
+    decide('track-1', { keep: true, rating: 4 }, 2)
     expect(getForTrack('track-1')).toEqual({ keep: true, rating: 4 })
-    undo()
+    const entry = undo()
+    expect(entry).toEqual({ trackId: 'track-1', previous: undefined, queueIndex: 2 })
     expect(getForTrack('track-1')).toBeUndefined()
   })
 

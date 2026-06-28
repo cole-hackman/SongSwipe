@@ -8,6 +8,7 @@ export type SessionData = {
   cullPlaylistId?: string | null
   currentIndex?: number
   decisions?: Record<string, unknown>
+  sessionMode?: 'triage' | 'audit' | 'compare'
   updatedAt?: string
 }
 

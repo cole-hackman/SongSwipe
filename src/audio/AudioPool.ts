@@ -1,3 +1,5 @@
+import { describePlaybackError } from '@/audio/playback'
+
 export type AudioTrackRef = {
   index: number
   path: string
@@ -18,6 +20,7 @@ export class AudioPool {
   private ahead: number
   private behind: number
   private resolveUrl: (path: string) => Promise<string>
+  private trackSignature = ''
 
   constructor(options: AudioPoolOptions) {
     this.ahead = options.ahead ?? 5
@@ -33,17 +36,25 @@ export class AudioPool {
     return this.elements.get(this.currentIndex) ?? null
   }
 
+  activePath(): string | null {
+    return this.paths.get(this.currentIndex) ?? null
+  }
+
   loadedIndices(): number[] {
     return [...this.elements.keys()].sort((a, b) => a - b)
   }
 
-  async setTracks(tracks: Array<{ path: string }>): Promise<void> {
-    this.releaseAll()
-    this.paths.clear()
-    tracks.forEach((track, index) => {
-      if (track.path) this.paths.set(index, track.path)
-    })
-    await this.setCurrent(this.currentIndex)
+  async setTracks(tracks: Array<{ path: string }>, index = this.currentIndex): Promise<void> {
+    const signature = tracks.map((track) => track.path).join('\0')
+    if (signature !== this.trackSignature) {
+      this.trackSignature = signature
+      this.releaseAll()
+      this.paths.clear()
+      tracks.forEach((track, trackIndex) => {
+        if (track.path) this.paths.set(trackIndex, track.path)
+      })
+    }
+    await this.setCurrent(index)
   }
 
   async setCurrent(index: number): Promise<void> {
@@ -68,12 +79,26 @@ export class AudioPool {
     }
   }
 
+  async ensureReady(index = this.currentIndex): Promise<HTMLAudioElement> {
+    await this.setCurrent(index)
+    const element = this.active()
+    if (!element) {
+      const filePath = this.paths.get(this.currentIndex)
+      throw new Error(
+        filePath
+          ? `Audio file missing on disk:\n${filePath}`
+          : 'No audio file for the current track.',
+      )
+    }
+    return element
+  }
+
   private async ensureElement(index: number): Promise<void> {
-    const path = this.paths.get(index)
-    if (!path) return
+    const filePath = this.paths.get(index)
+    if (!filePath) return
     if (this.elements.has(index) && this.urls.get(index)) return
 
-    const url = await this.resolveUrl(path)
+    const url = await this.resolveUrl(filePath)
     let element = this.elements.get(index)
     if (!element) {
       element = new Audio()
@@ -87,8 +112,14 @@ export class AudioPool {
     }
   }
 
-  async play(): Promise<void> {
-    await this.active()?.play()
+  async play(index = this.currentIndex): Promise<void> {
+    const element = await this.ensureReady(index)
+    const filePath = this.paths.get(index) ?? null
+    try {
+      await element.play()
+    } catch (error) {
+      throw new Error(describePlaybackError(error, element, filePath))
+    }
   }
 
   pause(): void {
@@ -109,5 +140,6 @@ export class AudioPool {
     }
     this.elements.clear()
     this.urls.clear()
+    this.trackSignature = ''
   }
 }

@@ -1,13 +1,34 @@
 import { useWaveform } from '@/audio/useWaveform'
-import type { Cue } from '@/lib/types'
+import type { BeatMarker, Cue } from '@/lib/types'
 
 type WaveformPlayerProps = {
   media: HTMLAudioElement | null
+  filePath: string
   cues: Cue[]
+  beatgrid?: BeatMarker[]
+  barWidth?: number
+  normalize?: boolean
+  fastMode?: boolean
 }
 
-export function WaveformPlayer({ media, cues }: WaveformPlayerProps) {
-  const { containerRef } = useWaveform({ media, cues })
+export function WaveformPlayer({
+  media,
+  filePath,
+  cues,
+  beatgrid,
+  barWidth,
+  normalize,
+  fastMode,
+}: WaveformPlayerProps) {
+  const { containerRef } = useWaveform({
+    media,
+    filePath,
+    cues,
+    beatgrid,
+    barWidth,
+    normalize,
+    fastMode,
+  })
 
   return (
     <div className="waveform-wrap">

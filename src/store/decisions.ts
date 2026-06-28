@@ -4,14 +4,17 @@ import type { TrackDecision } from '@/lib/types'
 type HistoryEntry = {
   trackId: string
   previous: TrackDecision | undefined
+  queueIndex: number
 }
 
 type DecisionsState = {
   decisions: Record<string, TrackDecision>
   history: HistoryEntry[]
-  decide: (trackId: string, decision: TrackDecision) => void
+  decide: (trackId: string, decision: TrackDecision, queueIndex: number) => void
   patch: (trackId: string, patch: Partial<TrackDecision>) => void
-  undo: () => void
+  updateDecision: (trackId: string, patch: Partial<TrackDecision>) => void
+  removeDecision: (trackId: string) => void
+  undo: () => HistoryEntry | null
   clearCommitted: (trackIds: string[]) => void
   pending: () => Record<string, TrackDecision>
   getForTrack: (trackId: string) => TrackDecision | undefined
@@ -22,11 +25,11 @@ export const useDecisionsStore = create<DecisionsState>((set, get) => ({
   decisions: {},
   history: [],
 
-  decide(trackId, decision) {
+  decide(trackId, decision, queueIndex) {
     const previous = get().decisions[trackId]
     set((state) => ({
       decisions: { ...state.decisions, [trackId]: decision },
-      history: [...state.history, { trackId, previous }],
+      history: [...state.history, { trackId, previous, queueIndex }],
     }))
   },
 
@@ -35,13 +38,25 @@ export const useDecisionsStore = create<DecisionsState>((set, get) => ({
     const merged = { ...(existing ?? { keep: true }), ...patch }
     set((state) => ({
       decisions: { ...state.decisions, [trackId]: merged },
-      history: [...state.history, { trackId, previous: existing }],
+      history: state.history,
     }))
+  },
+
+  updateDecision(trackId, patch) {
+    get().patch(trackId, patch)
+  },
+
+  removeDecision(trackId) {
+    set((state) => {
+      const next = { ...state.decisions }
+      delete next[trackId]
+      return { decisions: next }
+    })
   },
 
   undo() {
     const { history } = get()
-    if (!history.length) return
+    if (!history.length) return null
     const last = history[history.length - 1]
     set((state) => {
       const next = { ...state.decisions }
@@ -55,6 +70,7 @@ export const useDecisionsStore = create<DecisionsState>((set, get) => ({
         history: state.history.slice(0, -1),
       }
     })
+    return last
   },
 
   clearCommitted(trackIds) {

@@ -2,7 +2,8 @@ import { app, BrowserWindow, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
-import { registerIpcHandlers, startSidecar, stopSidecar } from './ipc'
+import { ensureMediaServer, stopMediaServer } from './media-server'
+import { loadPersistedSettings, registerIpcHandlers, ensureSidecarReady, stopSidecar } from './ipc'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -58,20 +59,24 @@ async function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await ensureMediaServer()
   registerIpcHandlers()
-  startSidecar()
-  createWindow()
+  await loadPersistedSettings()
+  await ensureSidecarReady()
+  await createWindow()
 })
 
 app.on('window-all-closed', () => {
   win = null
   stopSidecar()
+  stopMediaServer()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
   stopSidecar()
+  stopMediaServer()
 })
 
 app.on('second-instance', () => {

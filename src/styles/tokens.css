@@ -1,0 +1,16 @@
+:root {
+  --bg: #0d0d0f;
+  --surface: #161618;
+  --elevated: #1d1d20;
+  --border: #2a2a2e;
+  --text: #ededed;
+  --muted: #8a8a90;
+  --keep: #00d4aa;
+  --cull: #ff5470;
+  --rating: #f5a623;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --font-display: 'Bricolage Grotesque', sans-serif;
+  --font-ui: 'Hanken Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}

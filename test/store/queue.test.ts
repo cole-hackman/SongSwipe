@@ -1,0 +1,37 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useQueueStore } from '@/store/queue'
+
+vi.mock('@/lib/ipc', () => ({
+  rb: vi.fn(),
+}))
+
+import { rb } from '@/lib/ipc'
+
+describe('queue store', () => {
+  beforeEach(() => {
+    useQueueStore.setState({
+      playlists: [],
+      tracks: [],
+      cues: [],
+      currentIndex: 0,
+      loading: false,
+      error: null,
+      sourcePlaylistId: null,
+    })
+    vi.mocked(rb).mockReset()
+  })
+
+  it('loads tracks for a playlist', async () => {
+    vi.mocked(rb).mockImplementation(async (method) => {
+      if (method === 'get_tracks') {
+        return [{ id: '1', path: '/a.mp3', title: 'A', artist: '', album: '', bpm: null, key: '', rating: 0, colorId: 0, durationSec: 0, artworkPath: null }]
+      }
+      if (method === 'get_cues') return []
+      return []
+    })
+
+    await useQueueStore.getState().selectPlaylist('playlist-1')
+    expect(useQueueStore.getState().tracks).toHaveLength(1)
+    expect(useQueueStore.getState().sourcePlaylistId).toBe('playlist-1')
+  })
+})

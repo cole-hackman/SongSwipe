@@ -5,17 +5,17 @@ import { useQueueStore } from '@/store/queue'
 import { useSettingsStore } from '@/store/settings'
 
 const DEFAULT_RULE: BatchRule = {
-  id: 'default-bpm-cull',
+  id: 'default-bpm-cut',
   enabled: false,
   field: 'bpm',
   op: 'lt',
   value: 110,
-  action: 'suggest_cull',
+  action: 'suggest_cut',
 }
 
 export function LibrarySettings() {
   const dbPathOverride = useSettingsStore((s) => s.dbPathOverride)
-  const zeroRatingOnCull = useSettingsStore((s) => s.zeroRatingOnCull)
+  const zeroRatingOnCut = useSettingsStore((s) => s.zeroRatingOnCut)
   const prefetchAhead = useSettingsStore((s) => s.prefetchAhead)
   const prefetchBehind = useSettingsStore((s) => s.prefetchBehind)
   const autoPlay = useSettingsStore((s) => s.autoPlay)
@@ -24,7 +24,7 @@ export function LibrarySettings() {
   const waveformFastMode = useSettingsStore((s) => s.waveformFastMode)
   const batchRules = useSettingsStore((s) => s.batchRules)
   const setDbPathOverride = useSettingsStore((s) => s.setDbPathOverride)
-  const setZeroRatingOnCull = useSettingsStore((s) => s.setZeroRatingOnCull)
+  const setZeroRatingOnCut = useSettingsStore((s) => s.setZeroRatingOnCut)
   const setPrefetchAhead = useSettingsStore((s) => s.setPrefetchAhead)
   const setPrefetchBehind = useSettingsStore((s) => s.setPrefetchBehind)
   const setAutoPlay = useSettingsStore((s) => s.setAutoPlay)
@@ -34,8 +34,10 @@ export function LibrarySettings() {
   const setBatchRules = useSettingsStore((s) => s.setBatchRules)
   const gamepadEnabled = useSettingsStore((s) => s.gamepadEnabled)
   const midiEnabled = useSettingsStore((s) => s.midiEnabled)
+  const cuePlacementMode = useSettingsStore((s) => s.cuePlacementMode)
   const setGamepadEnabled = useSettingsStore((s) => s.setGamepadEnabled)
   const setMidiEnabled = useSettingsStore((s) => s.setMidiEnabled)
+  const setCuePlacementMode = useSettingsStore((s) => s.setCuePlacementMode)
   const loadPlaylists = useQueueStore((s) => s.loadPlaylists)
   const [draftPath, setDraftPath] = useState(dbPathOverride ?? '')
   const [status, setStatus] = useState<string | null>(null)
@@ -64,8 +66,8 @@ export function LibrarySettings() {
   }
 
   async function toggleZeroRating(checked: boolean) {
-    setZeroRatingOnCull(checked)
-    await writeSettings({ zeroRatingOnCull: checked })
+    setZeroRatingOnCut(checked)
+    await writeSettings({ zeroRatingOnCut: checked })
   }
 
   async function updatePrefetch(ahead: number, behind: number) {
@@ -103,6 +105,11 @@ export function LibrarySettings() {
   async function toggleMidi(checked: boolean) {
     setMidiEnabled(checked)
     await writeSettings({ midiEnabled: checked })
+  }
+
+  async function handleCueModeChange(mode: 'presets' | 'smart') {
+    setCuePlacementMode(mode)
+    await writeSettings({ cuePlacementMode: mode })
   }
 
   return (
@@ -176,6 +183,21 @@ export function LibrarySettings() {
         </label>
       </div>
       <div className="panel-block">
+        <h2>Cues</h2>
+        <label className="top-bar__meta" htmlFor="cue-placement-mode">
+          Cue Placement Mode
+        </label>
+        <select
+          id="cue-placement-mode"
+          className="input"
+          value={cuePlacementMode}
+          onChange={(event) => void handleCueModeChange(event.target.value as 'presets' | 'smart')}
+        >
+          <option value="presets">Fixed Metrical Presets (Intro/32/64/Outro)</option>
+          <option value="smart">Algorithmic Smart Detection (Librosa)</option>
+        </select>
+      </div>
+      <div className="panel-block">
         <h2>Controllers</h2>
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
@@ -183,7 +205,7 @@ export function LibrarySettings() {
             checked={gamepadEnabled}
             onChange={(event) => void toggleGamepad(event.target.checked)}
           />
-          <span>Gamepad (A=cull, B=keep, X=play)</span>
+          <span>Gamepad (A=cut, B=keep, X=play)</span>
         </label>
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
@@ -191,7 +213,7 @@ export function LibrarySettings() {
             checked={midiEnabled}
             onChange={(event) => void toggleMidi(event.target.checked)}
           />
-          <span>MIDI (C2=cull, D2=keep, E2=play)</span>
+          <span>MIDI (C2=cut, D2=keep, E2=play)</span>
         </label>
       </div>
       <div className="panel-block">
@@ -202,14 +224,14 @@ export function LibrarySettings() {
             checked={rule.enabled}
             onChange={(event) => void updateRule({ ...rule, enabled: event.target.checked })}
           />
-          <span>Suggest cull when BPM &lt;</span>
+          <span>Suggest cut when BPM &lt;</span>
         </label>
         <input
           className="input"
           type="number"
           value={Number(rule.value ?? 110)}
           onChange={(event) =>
-            void updateRule({ ...rule, value: Number(event.target.value), action: 'suggest_cull' })
+            void updateRule({ ...rule, value: Number(event.target.value), action: 'suggest_cut' })
           }
         />
       </div>
@@ -231,10 +253,10 @@ export function LibrarySettings() {
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
             type="checkbox"
-            checked={zeroRatingOnCull}
+            checked={zeroRatingOnCut}
             onChange={(event) => void toggleZeroRating(event.target.checked)}
           />
-          <span>Set culled tracks to 0 stars on commit</span>
+          <span>Set cut tracks to 0 stars on commit</span>
         </label>
         {status ? <p className="top-bar__meta">{status}</p> : null}
       </div>

@@ -54,5 +54,11 @@ describe('getEffectivePresets', () => {
     expect(presets.length).toBe(4)
     expect(presets[0].id).toBe('intro')
   })
+
+  it('falls back to standard presets in smart mode if smart cues array is empty', () => {
+    const presets = getEffectivePresets(track, [], [], 'smart')
+    expect(presets.length).toBe(4)
+    expect(presets[0].id).toBe('intro')
+  })
 })
 

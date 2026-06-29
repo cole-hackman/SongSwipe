@@ -416,7 +416,6 @@ def add_to_playlist(playlist_id: str, track_id: str) -> dict[str, Any]:
 
 
 def analyze_track_cues(track_path: str) -> list[float]:
-    import os
     if not os.path.exists(track_path):
         return []
     try:

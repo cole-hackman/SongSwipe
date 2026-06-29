@@ -27,7 +27,7 @@ export function getEffectivePresets(
   smartCues: Cue[] | undefined,
   cuePlacementMode: 'presets' | 'smart'
 ): CuePreset[] {
-  if (cuePlacementMode === 'smart' && smartCues) {
+  if (cuePlacementMode === 'smart' && smartCues && smartCues.length > 0) {
     return smartCues.map((cue, index) => ({
       id: `smart-${index}`,
       label: cue.name,

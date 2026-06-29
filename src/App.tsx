@@ -16,7 +16,7 @@ import { TriageTopBar } from '@/components/triage/TriageTopBar'
 import { TriageView } from '@/components/triage/TriageView'
 import { UndoToast } from '@/components/UndoToast'
 import { evaluateRules } from '@/lib/batch-rules'
-import { buildCuePresets } from '@/lib/cue-presets'
+import { getEffectivePresets } from '@/lib/cue-presets'
 import {
   ensureSidecarReady,
   getSidecarStatus,
@@ -115,7 +115,9 @@ export default function App() {
     return instance
   }, [prefetchAhead, prefetchBehind])
 
-  const cuePresets = useMemo(() => (track ? buildCuePresets(track, cues) : []), [track, cues])
+  const cuePresets = useMemo(() => {
+    return track ? getEffectivePresets(track, cues, smartCuesByTrackId[track.id], cuePlacementMode) : []
+  }, [track, cues, smartCuesByTrackId, cuePlacementMode])
   const activeRule = useMemo(() => {
     if (!track || dismissedRuleTrackIds.has(track.id)) return null
     return evaluateRules(track, batchRules)

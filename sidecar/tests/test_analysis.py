@@ -16,13 +16,18 @@ def test_analyze_track_cues_returns_onset_times(mock_load, mock_exists):
     # Mock librosa.load return values: y (dummy array), sr (dummy sample rate)
     mock_load.return_value = (MagicMock(), 22050)
     
-    # Mock librosa onset functions
-    with patch("librosa.onset.onset_strength") as mock_strength, \
-         patch("librosa.onset.onset_detect") as mock_detect, \
+    # Mock librosa feature and segment functions
+    with patch("librosa.feature.mfcc") as mock_mfcc, \
+         patch("librosa.segment.agglomerative") as mock_agglomerative, \
          patch("librosa.frames_to_time") as mock_time:
          
-        mock_detect.return_value = [10, 20]
-        mock_time.return_value = [0.5, 1.0]
+        # Set up shape mock for n_frames calculation
+        mock_mfcc_array = MagicMock()
+        mock_mfcc_array.shape = (13, 100)
+        mock_mfcc.return_value = mock_mfcc_array
+        
+        mock_agglomerative.return_value = [0, 40]
+        mock_time.return_value = [0.0, 15.0]
         
         result = commands.analyze_track_cues("dummy.wav")
-        assert result == [0.5, 1.0]
+        assert result == [0.0, 15.0]

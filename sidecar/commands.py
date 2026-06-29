@@ -421,16 +421,20 @@ def analyze_track_cues(track_path: str) -> list[float]:
     try:
         import librosa
         y, sr = librosa.load(track_path, sr=22050)
-        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-        # hop_length is 512 by default in librosa. Minimum 5 seconds between cues = 5 * sr // 512 frames
-        wait_frames = int(5 * sr / 512)
-        onset_frames = librosa.onset.onset_detect(
-            onset_envelope=onset_env, sr=sr,
-            wait=wait_frames,
-            pre_max=5, post_max=5, pre_avg=10, post_avg=10, delta=0.2
-        )
-        onset_times = librosa.frames_to_time(onset_frames, sr=sr)
-        return [float(t) for t in onset_times]
+        # Extract timbral features (MFCCs)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        # Partition audio into k contiguous clusters using Agglomerative Clustering
+        n_frames = mfcc.shape[1]
+        k = min(10, max(2, n_frames // 10))
+        bounds = librosa.segment.agglomerative(mfcc, k)
+        boundary_times = librosa.frames_to_time(bounds, sr=sr)
+        # Sort and filter boundaries to keep them at least 10 seconds apart
+        times = sorted([float(t) for t in boundary_times])
+        filtered_times = []
+        for t in times:
+            if not filtered_times or (t - filtered_times[-1]) >= 10.0:
+                filtered_times.append(t)
+        return filtered_times
     except Exception as e:
         print(f"Error analyzing track cues: {e}")
         return []

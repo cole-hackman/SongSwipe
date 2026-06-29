@@ -2,3 +2,5 @@ pyrekordbox==0.4.4
 sqlcipher3-wheels>=0.5.7
 psutil>=7.0.0
 pytest>=9.0.0
+librosa>=0.11.0
+soundfile>=0.14.0

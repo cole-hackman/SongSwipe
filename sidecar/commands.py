@@ -422,9 +422,11 @@ def analyze_track_cues(track_path: str) -> list[float]:
         import librosa
         y, sr = librosa.load(track_path, sr=22050)
         onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+        # hop_length is 512 by default in librosa. Minimum 5 seconds between cues = 5 * sr // 512 frames
+        wait_frames = int(5 * sr / 512)
         onset_frames = librosa.onset.onset_detect(
             onset_envelope=onset_env, sr=sr,
-            wait=sr // 2,
+            wait=wait_frames,
             pre_max=5, post_max=5, pre_avg=10, post_avg=10, delta=0.2
         )
         onset_times = librosa.frames_to_time(onset_frames, sr=sr)

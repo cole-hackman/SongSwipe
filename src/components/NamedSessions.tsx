@@ -17,7 +17,7 @@ type NamedSessionSnapshot = {
   name?: string
   sourcePlaylistId?: string | null
   destinationPlaylistId?: string | null
-  cullPlaylistId?: string | null
+  cutPlaylistId?: string | null
   currentIndex?: number
   decisions?: Record<string, TrackDecision>
   sessionMode?: string
@@ -34,10 +34,10 @@ export function NamedSessions() {
   const selectPlaylist = useQueueStore((s) => s.selectPlaylist)
   const setCurrentIndex = useQueueStore((s) => s.setCurrentIndex)
   const destinationPlaylistId = useSettingsStore((s) => s.destinationPlaylistId)
-  const cullPlaylistId = useSettingsStore((s) => s.cullPlaylistId)
+  const cutPlaylistId = useSettingsStore((s) => s.cutPlaylistId)
   const sessionMode = useSettingsStore((s) => s.sessionMode)
   const setDestinationPlaylistId = useSettingsStore((s) => s.setDestinationPlaylistId)
-  const setCullPlaylistId = useSettingsStore((s) => s.setCullPlaylistId)
+  const setCutPlaylistId = useSettingsStore((s) => s.setCutPlaylistId)
   const setSessionMode = useSettingsStore((s) => s.setSessionMode)
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export function NamedSessions() {
       name,
       sourcePlaylistId,
       destinationPlaylistId,
-      cullPlaylistId,
+      cutPlaylistId,
       currentIndex,
       decisions,
       sessionMode,
@@ -68,7 +68,7 @@ export function NamedSessions() {
     const data = await loadNamedSession<NamedSessionSnapshot>(id)
     if (!data) return
     if (data.destinationPlaylistId) setDestinationPlaylistId(data.destinationPlaylistId)
-    if (data.cullPlaylistId) setCullPlaylistId(data.cullPlaylistId)
+    if (data.cutPlaylistId) setCutPlaylistId(data.cutPlaylistId)
     if (data.sessionMode) setSessionMode(data.sessionMode as 'triage' | 'audit' | 'compare')
     if (data.sourcePlaylistId) await selectPlaylist(data.sourcePlaylistId)
     if (typeof data.currentIndex === 'number') setCurrentIndex(data.currentIndex)

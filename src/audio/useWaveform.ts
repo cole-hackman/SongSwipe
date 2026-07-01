@@ -2,27 +2,37 @@ import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js'
 import { loadPeaksForPath, persistPeaks } from '@/audio/peak-store'
-import type { BeatMarker, Cue } from '@/lib/types'
+import type { BeatMarker } from '@/lib/types'
+import type { WaveformMarker } from '@/lib/waveform-markers'
 
 type UseWaveformOptions = {
   media: HTMLAudioElement | null
   filePath: string
-  cues: Cue[]
+  markers: WaveformMarker[]
   beatgrid?: BeatMarker[]
   barWidth?: number
   normalize?: boolean
   fastMode?: boolean
+  height?: number
+  onSeek?: (seconds: number) => void
 }
 
 export function useWaveform({
   media,
   filePath,
-  cues,
+  markers,
   beatgrid = [],
   barWidth = 2,
   normalize = true,
   fastMode = false,
+  height = 96,
+  onSeek,
 }: UseWaveformOptions) {
+  const onSeekRef = useRef(onSeek)
+  useEffect(() => {
+    onSeekRef.current = onSeek
+  }, [onSeek])
+
   const containerRef = useRef<HTMLDivElement | null>(null)
   const wavesurferRef = useRef<WaveSurfer | null>(null)
   const regionsRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null)
@@ -43,10 +53,10 @@ export function useWaveform({
       const wavesurfer = WaveSurfer.create({
         container: containerRef.current,
         media,
-        height: 96,
-        waveColor: '#8a8a90',
-        progressColor: '#00d4aa',
-        cursorColor: '#ededed',
+        height,
+        waveColor: '#2e383f',
+        progressColor: '#5eead4',
+        cursorColor: '#eef3f5',
         barWidth: fastMode ? 4 : barWidth,
         barGap: fastMode ? 2 : 1,
         normalize,
@@ -67,6 +77,14 @@ export function useWaveform({
       wavesurfer.on('error', () => {
         // Waveform decode can fail when the file is missing; playback errors are surfaced separately.
       })
+      wavesurfer.on('interaction', () => {
+        onSeekRef.current?.(wavesurfer.getCurrentTime())
+      })
+      regions.on('region-clicked', (region, event) => {
+        event.stopPropagation()
+        wavesurfer.setTime(region.start)
+        onSeekRef.current?.(region.start)
+      })
     })()
 
     return () => {
@@ -83,16 +101,6 @@ export function useWaveform({
     if (!regions || !isReady) return
 
     regions.clearRegions()
-    cues.forEach((cue, index) => {
-      regions.addRegion({
-        id: `cue-${index}`,
-        start: cue.positionSec,
-        end: cue.positionSec + 0.05,
-        color: 'rgba(245, 166, 35, 0.55)',
-        drag: false,
-        resize: false,
-      })
-    })
 
     beatgrid
       .filter((beat) => beat.beatInBar === 1)
@@ -101,12 +109,31 @@ export function useWaveform({
           id: `beat-${index}`,
           start: beat.positionSec,
           end: beat.positionSec + 0.02,
-          color: 'rgba(91, 141, 239, 0.35)',
+          color: 'rgba(91, 141, 239, 0.18)',
           drag: false,
           resize: false,
         })
       })
-  }, [beatgrid, cues, isReady])
+
+    markers.forEach((marker) => {
+      regions.addRegion({
+        id: marker.id,
+        start: marker.positionSec,
+        end: marker.positionSec + 0.04,
+        color: hexToRgba(marker.color, 0.95),
+        drag: false,
+        resize: false,
+      })
+    })
+  }, [beatgrid, markers, isReady])
 
   return { containerRef, isReady }
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const value = hex.replace('#', '')
+  const r = parseInt(value.slice(0, 2), 16)
+  const g = parseInt(value.slice(2, 4), 16)
+  const b = parseInt(value.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

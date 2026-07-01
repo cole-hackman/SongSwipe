@@ -1,6 +1,6 @@
 export type KeyAction =
   | 'keep'
-  | 'cull'
+  | 'cut'
   | 'play'
   | 'undo'
   | 'help'
@@ -20,7 +20,7 @@ export type KeyAction =
 
 export const KEY_ACTIONS: KeyAction[] = [
   'keep',
-  'cull',
+  'cut',
   'play',
   'undo',
   'help',
@@ -41,7 +41,7 @@ export const KEY_ACTIONS: KeyAction[] = [
 
 export const DEFAULT_KEYMAP: Record<KeyAction, string> = {
   keep: 'ArrowRight',
-  cull: 'ArrowLeft',
+  cut: 'ArrowLeft',
   play: ' ',
   undo: 'z',
   help: '?',

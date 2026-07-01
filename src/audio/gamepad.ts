@@ -1,7 +1,7 @@
-export type GamepadAction = 'keep' | 'cull' | 'play'
+export type GamepadAction = 'keep' | 'cut' | 'play'
 
 const DEFAULT_BINDINGS: Record<number, GamepadAction> = {
-  0: 'cull',
+  0: 'cut',
   1: 'keep',
   2: 'play',
 }

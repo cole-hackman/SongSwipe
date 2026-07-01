@@ -51,15 +51,15 @@ def test_get_playlist_membership_returns_track_ids_per_playlist(mock_open_db):
     def songs_side_effect(PlaylistID):
         if PlaylistID == "keep-pl":
             return [MagicMock(ContentID="t1"), MagicMock(ContentID="t2")]
-        if PlaylistID == "cull-pl":
+        if PlaylistID == "cut-pl":
             return [MagicMock(ContentID="t2")]
         return []
 
     db.get_playlist_songs.side_effect = songs_side_effect
 
-    result = commands.get_playlist_membership(["keep-pl", "cull-pl"])
+    result = commands.get_playlist_membership(["keep-pl", "cut-pl"])
 
-    assert result == {"keep-pl": ["t1", "t2"], "cull-pl": ["t2"]}
+    assert result == {"keep-pl": ["t1", "t2"], "cut-pl": ["t2"]}
 
 
 @patch("commands.open_db")

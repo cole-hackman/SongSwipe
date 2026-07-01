@@ -47,13 +47,13 @@ export function ReviewQueue({ onClose }: ReviewQueueProps) {
                 <td>
                   <select
                     className="select"
-                    value={decision.keep ? 'keep' : 'cull'}
+                    value={decision.keep ? 'keep' : 'cut'}
                     onChange={(e) =>
                       updateDecision(trackId, { keep: e.target.value === 'keep' })
                     }
                   >
                     <option value="keep">Keep</option>
-                    <option value="cull">Cull</option>
+                    <option value="cut">Cut</option>
                   </select>
                 </td>
                 <td>

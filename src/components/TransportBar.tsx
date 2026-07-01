@@ -26,22 +26,26 @@ export function TransportBar({
 
   return (
     <div className="transport-bar">
-      <button type="button" className="btn" onClick={onTogglePlay}>
-        {isPlaying ? 'Pause' : 'Play'}
-      </button>
-      <span className="transport-time">{formatTime(currentSec)}</span>
-      <input
-        className="transport-seek"
-        type="range"
-        min={0}
-        max={max}
-        step={0.1}
-        value={Math.min(currentSec, max)}
-        onChange={(event) => onSeek(Number(event.target.value))}
-        aria-label="Seek"
-      />
-      <span className="transport-time">{formatTime(durationSec)}</span>
-      {children}
+      <div className="transport-bar__left">
+        <button type="button" className="btn" onClick={onTogglePlay}>
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <span className="transport-time">{formatTime(currentSec)}</span>
+      </div>
+      <div className="transport-bar__seek">
+        <input
+          className="transport-seek"
+          type="range"
+          min={0}
+          max={max}
+          step={0.1}
+          value={Math.min(currentSec, max)}
+          onChange={(event) => onSeek(Number(event.target.value))}
+          aria-label="Seek"
+        />
+        <span className="transport-time">{formatTime(durationSec)}</span>
+      </div>
+      <div className="transport-bar__actions">{children}</div>
     </div>
   )
 }

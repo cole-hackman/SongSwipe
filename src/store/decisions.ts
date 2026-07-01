@@ -16,6 +16,7 @@ type DecisionsState = {
   removeDecision: (trackId: string) => void
   undo: () => HistoryEntry | null
   clearCommitted: (trackIds: string[]) => void
+  resetDecisions: (mode: 'all' | 'keep' | 'cut') => number
   pending: () => Record<string, TrackDecision>
   getForTrack: (trackId: string) => TrackDecision | undefined
   hydrate: (decisions: Record<string, TrackDecision>) => void
@@ -79,6 +80,25 @@ export const useDecisionsStore = create<DecisionsState>((set, get) => ({
       for (const id of trackIds) delete next[id]
       return { decisions: next }
     })
+  },
+
+  resetDecisions(mode) {
+    const current = get().decisions
+    const next: Record<string, TrackDecision> = {}
+    let removed = 0
+    for (const [trackId, decision] of Object.entries(current)) {
+      const matches =
+        mode === 'all' ||
+        (mode === 'keep' && decision.keep) ||
+        (mode === 'cut' && !decision.keep)
+      if (matches) {
+        removed += 1
+      } else {
+        next[trackId] = decision
+      }
+    }
+    if (removed > 0) set({ decisions: next, history: [] })
+    return removed
   },
 
   pending() {

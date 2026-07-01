@@ -13,6 +13,69 @@ const DEFAULT_RULE: BatchRule = {
   action: 'suggest_cut',
 }
 
+type NumberStepperProps = {
+  value: number
+  onChange: (value: number) => void
+  min?: number
+  max?: number
+  step?: number
+  id?: string
+}
+
+function NumberStepper({
+  value,
+  onChange,
+  min = 0,
+  max = Infinity,
+  step = 1,
+  id,
+}: NumberStepperProps) {
+  const handleDecrement = () => {
+    onChange(Math.max(min, value - step))
+  }
+
+  const handleIncrement = () => {
+    onChange(Math.min(max, value + step))
+  }
+
+  return (
+    <div className="number-stepper">
+      <button
+        type="button"
+        className="number-stepper__btn"
+        onClick={handleDecrement}
+        disabled={value <= min}
+        aria-label="Decrease value"
+      >
+        −
+      </button>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        className="number-stepper__input"
+        value={value}
+        onChange={(event) => {
+          const val = Number(event.target.value.replace(/\D/g, ''))
+          if (!isNaN(val)) {
+            onChange(Math.max(min, Math.min(max, val)))
+          }
+        }}
+      />
+      <button
+        type="button"
+        className="number-stepper__btn"
+        onClick={handleIncrement}
+        disabled={value >= max}
+        aria-label="Increase value"
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
 export function LibrarySettings() {
   const dbPathOverride = useSettingsStore((s) => s.dbPathOverride)
   const zeroRatingOnCut = useSettingsStore((s) => s.zeroRatingOnCut)
@@ -127,26 +190,22 @@ export function LibrarySettings() {
         <label className="top-bar__meta" htmlFor="prefetch-ahead">
           Prefetch ahead
         </label>
-        <input
+        <NumberStepper
           id="prefetch-ahead"
-          className="input"
-          type="number"
           min={0}
           max={20}
           value={prefetchAhead}
-          onChange={(event) => void updatePrefetch(Number(event.target.value), prefetchBehind)}
+          onChange={(val) => void updatePrefetch(val, prefetchBehind)}
         />
         <label className="top-bar__meta" htmlFor="prefetch-behind">
           Prefetch behind
         </label>
-        <input
+        <NumberStepper
           id="prefetch-behind"
-          className="input"
-          type="number"
           min={0}
           max={10}
           value={prefetchBehind}
-          onChange={(event) => void updatePrefetch(prefetchAhead, Number(event.target.value))}
+          onChange={(val) => void updatePrefetch(prefetchAhead, val)}
         />
       </div>
       <div className="panel-block">
@@ -154,16 +213,12 @@ export function LibrarySettings() {
         <label className="top-bar__meta" htmlFor="waveform-bar-width">
           Bar width
         </label>
-        <input
+        <NumberStepper
           id="waveform-bar-width"
-          className="input"
-          type="number"
           min={1}
           max={6}
           value={waveformBarWidth}
-          onChange={(event) =>
-            void updateWaveform({ waveformBarWidth: Number(event.target.value) })
-          }
+          onChange={(val) => void updateWaveform({ waveformBarWidth: val })}
         />
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
@@ -226,13 +281,11 @@ export function LibrarySettings() {
           />
           <span>Suggest cut when BPM &lt;</span>
         </label>
-        <input
-          className="input"
-          type="number"
+        <NumberStepper
+          min={40}
+          max={250}
           value={Number(rule.value ?? 110)}
-          onChange={(event) =>
-            void updateRule({ ...rule, value: Number(event.target.value), action: 'suggest_cut' })
-          }
+          onChange={(val) => void updateRule({ ...rule, value: val, action: 'suggest_cut' })}
         />
       </div>
       <div className="panel-block">

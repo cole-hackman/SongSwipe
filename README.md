@@ -17,19 +17,21 @@ Cull means “add to cull playlist,” not “delete from disk.” Hot cues and 
 
 ### Core workflow
 
-- **Tinder-style swipe deck** with keep/cull gestures and undo
-- **Waveform player** with hot-cue regions, optional beatgrid downbeat overlay, and cached peaks for faster revisits
+- **Tinder-style swipe deck** with keep/cut gestures and undo
+- **Waveform player** with hot-cue regions, optional beatgrid downbeat overlay, cached peaks, and de-duplicated cue+preset markers
 - **Transport bar** with play/pause, seek, hot-cue buttons, and skip presets
 - **Rating and color tagging** during triage, written back on commit
-- **Destination playlists** — global keep/cull targets plus per-track keep overrides
+- **Destination playlists** — global keep/cut targets plus per-track keep overrides
 - **Session persistence** — auto-saves progress; named sessions with save/load/delete
+- **Card stack triage layout** — interactive front card with decorative depth layers, three-zone top bar, collapsible playlist drawer, right decision rail, and drawer-based session/settings panels
+- **Keyboard hint** — persistent footer pill showing current key bindings (Triage mode)
 
 ### Session modes
 
 | Mode | Purpose |
 |------|---------|
 | **Triage** | Swipe workflow with waveform, transport, and track controls |
-| **Audit** | Scrollable list of all tracks with decision status and inline playback |
+| **Audit** | Scrollable, configurable-column list of all tracks with decision status, inline playback, and sortable metadata (comment, play count, dates, file type) |
 | **Compare** | A/B two tracks side by side for close listening |
 
 ### Smart assistance
@@ -83,11 +85,15 @@ SongSwipe never writes to `master.db` while Rekordbox is running.
 └─────────────────────────────────────────────────────────┘
 ```
 
-- **Renderer** — swipe UI, wavesurfer.js waveforms, audio pool with prefetch
+- **Renderer** — triage swipe UI with drawer-based panels, card stack, wavesurfer.js waveforms with cue/beatgrid markers, audio pool with prefetch
 - **Main process** — custom `songswipe-media://` protocol, waveform peak cache, named sessions, export dialogs
 - **Sidecar** — `rb_bridge.py` exposes Rekordbox operations over line-delimited JSON-RPC
 
 Write scope is intentionally limited: **rating, color, and playlist membership only**. No hot-cue writes, no My Tags writes, no file deletion.
+
+### Design
+
+Dark theme with a curated token palette (`--bg`, `--panel`, `--line`, `--txt`, etc.) defined in `src/styles/tokens.css`. The UI uses **Archivo** (display/UI) and **IBM Plex Mono** (monospace) fonts, bundled via `@fontsource` packages — no external network requests for type.
 
 ## Prerequisites
 
@@ -138,11 +144,11 @@ SONGSWIPE_TEST_DB=/path/to/master.db.copy npm run test:sidecar
 
 ## Keyboard shortcuts
 
-Default bindings — customize in **Keyboard map** settings. Press `?` in-app for help.
+Default bindings — customize in **Keyboard map** settings. Press `?` in-app for help. Triage mode also shows a persistent footer hint with your current bindings.
 
 | Key | Action |
 |-----|--------|
-| `←` / `→` | Cull / Keep (Triage mode) |
+| `←` / `→` | Cut / Keep (Triage mode) |
 | `Space` | Play / Pause |
 | `1`–`8` | Jump to hot cue |
 | `Shift+1`–`Shift+5` | Set rating |
@@ -152,18 +158,25 @@ Default bindings — customize in **Keyboard map** settings. Press `?` in-app fo
 ## Project structure
 
 ```
-├── electron/           Main process, preload, IPC, caches
+├── electron/              Main process, preload, IPC, caches
 │   └── main/
-├── src/                React renderer
-│   ├── audio/          Audio pool, waveform, gamepad/MIDI
-│   ├── components/     UI (swipe deck, commit dialog, etc.)
-│   ├── lib/            Types, keymap, batch rules, IPC helpers
-│   └── store/          Zustand stores (queue, decisions, settings)
-├── sidecar/            Python Rekordbox bridge
-│   ├── rb_bridge.py    JSON-RPC stdio server
-│   ├── commands.py     Rekordbox read/write commands
+├── src/                   React renderer
+│   ├── audio/             Audio pool, waveform, gamepad/MIDI
+│   ├── components/        UI components
+│   │   ├── triage/        Triage-mode layout (top bar, card stack, drawers, rails)
+│   │   └── ...            Shared components (swipe deck, commit dialog, etc.)
+│   ├── lib/               Types, keymap, batch rules, cue presets, waveform markers,
+│   │                      audit columns, IPC helpers
+│   ├── store/             Zustand stores (queue, decisions, settings)
+│   └── styles/            CSS tokens, global styles, triage layout
+├── sidecar/               Python Rekordbox bridge
+│   ├── rb_bridge.py       JSON-RPC stdio server
+│   ├── commands.py        Rekordbox read/write commands
 │   └── tests/
-├── test/               Vitest unit tests
+├── test/                  Vitest unit tests
+│   ├── components/
+│   ├── electron/
+│   └── lib/
 └── docs/superpowers/plans/   Feature implementation plans
 ```
 

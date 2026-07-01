@@ -1,7 +1,7 @@
-export type MidiAction = 'keep' | 'cull' | 'play'
+export type MidiAction = 'keep' | 'cut' | 'play'
 
 const DEFAULT_NOTE_MAP: Record<number, MidiAction> = {
-  36: 'cull',
+  36: 'cut',
   37: 'keep',
   38: 'play',
 }

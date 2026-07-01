@@ -12,7 +12,7 @@ export function buildSessionReportCsv(
       trackId,
       csvEscape(t?.title ?? ''),
       csvEscape(t?.artist ?? ''),
-      d.keep ? 'keep' : 'cull',
+      d.keep ? 'keep' : 'cut',
       d.rating ?? '',
       d.colorId ?? '',
       d.destPlaylistId ?? '',

@@ -7,9 +7,9 @@ export function DestinationPlaylist() {
   const playlists = useQueueStore((s) => s.playlists)
   const loadPlaylists = useQueueStore((s) => s.loadPlaylists)
   const destinationPlaylistId = useSettingsStore((s) => s.destinationPlaylistId)
-  const cullPlaylistId = useSettingsStore((s) => s.cullPlaylistId)
+  const cutPlaylistId = useSettingsStore((s) => s.cutPlaylistId)
   const setDestinationPlaylistId = useSettingsStore((s) => s.setDestinationPlaylistId)
-  const setCullPlaylistId = useSettingsStore((s) => s.setCullPlaylistId)
+  const setCutPlaylistId = useSettingsStore((s) => s.setCutPlaylistId)
   const [newPlaylistName, setNewPlaylistName] = useState('')
   const [creating, setCreating] = useState(false)
   const [createStatus, setCreateStatus] = useState<string | null>(null)
@@ -69,13 +69,13 @@ export function DestinationPlaylist() {
         {createStatus ? <p className="top-bar__meta">{createStatus}</p> : null}
       </div>
       <div className="panel-block">
-        <h2>Cull playlist</h2>
+        <h2>Cut playlist</h2>
         <select
           className="select"
-          value={cullPlaylistId ?? ''}
-          onChange={(event) => setCullPlaylistId(event.target.value || null)}
+          value={cutPlaylistId ?? ''}
+          onChange={(event) => setCutPlaylistId(event.target.value || null)}
         >
-          <option value="">Choose cull list…</option>
+          <option value="">Choose cut list…</option>
           {leafPlaylists.map((playlist) => (
             <option key={playlist.id} value={playlist.id}>
               {playlist.name}

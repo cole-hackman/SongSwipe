@@ -12,12 +12,12 @@ export type BatchRulePayload = {
   field: 'bpm' | 'rating' | 'key'
   op: 'lt' | 'gt' | 'eq' | 'empty'
   value?: string | number
-  action: 'suggest_keep' | 'suggest_cull'
+  action: 'suggest_keep' | 'suggest_cut'
 }
 
 export type AppSettingsPayload = {
   dbPathOverride?: string | null
-  zeroRatingOnCull?: boolean
+  zeroRatingOnCut?: boolean
   prefetchAhead?: number
   prefetchBehind?: number
   autoPlay?: boolean

@@ -18,7 +18,7 @@ export function ModeSwitcher({ mode, onChange }: ModeSwitcherProps) {
         <button
           key={item.id}
           type="button"
-          className={item.id === mode ? 'btn btn--primary' : 'btn'}
+          className={item.id === mode ? 'btn btn--active-mode' : 'btn'}
           onClick={() => onChange(item.id)}
         >
           {item.label}

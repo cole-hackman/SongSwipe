@@ -21,7 +21,7 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
   const decisions = useDecisionsStore((s) => s.decisions)
   const clearCommitted = useDecisionsStore((s) => s.clearCommitted)
   const destinationPlaylistId = useSettingsStore((s) => s.destinationPlaylistId)
-  const cullPlaylistId = useSettingsStore((s) => s.cullPlaylistId)
+  const cutPlaylistId = useSettingsStore((s) => s.cutPlaylistId)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [reviewing, setReviewing] = useState(false)
@@ -51,7 +51,7 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
       const plan = await rb<{ operations: PlannedOperation[] }>('plan_commit', {
         decisions: decisionPayload(),
         defaultDestId: destinationPlaylistId,
-        defaultCullId: cullPlaylistId,
+        defaultCutId: cutPlaylistId,
       })
       setDryRun(plan.operations)
       setStatus(`Dry-run: ${plan.operations.length} operation(s) planned.`)
@@ -69,7 +69,7 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
       const result = await rb<{ xml: string }>('export_commit_xml', {
         decisions: decisionPayload(),
         defaultDestId: destinationPlaylistId,
-        defaultCullId: cullPlaylistId,
+        defaultCutId: cutPlaylistId,
       })
       const saved = await exportTextFile('songswipe-commit.xml', result.xml, [
         { name: 'XML', extensions: ['xml'] },
@@ -104,6 +104,10 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
       return
     }
 
+    if (!window.confirm('Are you absolutely sure you want to write these decisions to the Rekordbox database? This will permanently modify your collection.')) {
+      return
+    }
+
     setBusy(true)
     setStatus(null)
     try {
@@ -132,8 +136,8 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
               await rb('add_to_playlist', { playlistId: destId, trackId })
             }
           }
-          if (!decision.keep && cullPlaylistId) {
-            await rb('add_to_playlist', { playlistId: cullPlaylistId, trackId })
+          if (!decision.keep && cutPlaylistId) {
+            await rb('add_to_playlist', { playlistId: cutPlaylistId, trackId })
           }
           committed.push(trackId)
         } catch (error) {
@@ -167,7 +171,7 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
       <div className="modal modal--wide" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2>Commit to Rekordbox</h2>
         <p>
-          {summary.keepCount} keep, {summary.cullCount} cull, {summary.ratingCount} ratings,{' '}
+          {summary.keepCount} keep, {summary.cutCount} cut, {summary.ratingCount} ratings,{' '}
           {summary.colorCount} colors.
         </p>
         {keepBlocked ? (
@@ -238,7 +242,7 @@ function summarize(decisions: Record<string, TrackDecision>) {
   const values = Object.values(decisions)
   return {
     keepCount: values.filter((d) => d.keep).length,
-    cullCount: values.filter((d) => !d.keep).length,
+    cutCount: values.filter((d) => !d.keep).length,
     ratingCount: values.filter((d) => d.rating != null).length,
     colorCount: values.filter((d) => d.colorId != null).length,
   }

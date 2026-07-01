@@ -100,8 +100,27 @@ export default function App() {
   const [dismissedRuleTrackIds, setDismissedRuleTrackIds] = useState<Set<string>>(new Set())
   const [leanDirection, setLeanDirection] = useState<'keep' | 'cut' | null>(null)
   const [missingPathsDismissed, setMissingPathsDismissed] = useState<string | null>(null)
+  const [showRightRail, setShowRightRail] = useState(true)
+  const [rbWarningOpen, setRbWarningOpen] = useState(false)
+  const [queueFilter, setQueueFilter] = useState<'all' | 'keep' | 'cut'>('all')
 
-  const track = currentTrack()
+  const filteredTracks = useMemo(() => {
+    if (queueFilter === 'all') return tracks
+    return tracks.filter((t) => {
+      const d = decisions[t.id]
+      if (queueFilter === 'keep') return d?.keep === true
+      if (queueFilter === 'cut') return d?.keep === false
+      return false
+    })
+  }, [tracks, decisions, queueFilter])
+
+  // Ensure index is within range of filtered tracks
+  const activeIndex = useMemo(() => {
+    if (filteredTracks.length === 0) return 0
+    return Math.max(0, Math.min(currentIndex, filteredTracks.length - 1))
+  }, [currentIndex, filteredTracks])
+
+  const track = filteredTracks[activeIndex] ?? null
   const poolRef = useRef<AudioPool | null>(null)
   const trackPathsKey = useMemo(() => tracks.map((item) => item.path).join('|'), [tracks])
   const pool = useMemo(() => {
@@ -347,6 +366,38 @@ export default function App() {
     setPlaybackDuration(track?.durationSec ?? 0)
   }, [track?.id, track?.durationSec, track])
 
+  useEffect(() => {
+    setCurrentIndex(0)
+  }, [queueFilter, setCurrentIndex])
+
+  const handleCommitClick = useCallback(async () => {
+    try {
+      const running = await rb<boolean>('is_rekordbox_running')
+      if (running) {
+        setRbWarningOpen(true)
+      } else {
+        setCommitOpen(true)
+      }
+    } catch {
+      setCommitOpen(true)
+    }
+  }, [])
+
+  const handleRbWarningRetry = useCallback(async () => {
+    try {
+      const running = await rb<boolean>('is_rekordbox_running')
+      if (!running) {
+        setRbWarningOpen(false)
+        setCommitOpen(true)
+      } else {
+        alert('Rekordbox is still running. Please close it and try again.')
+      }
+    } catch {
+      setRbWarningOpen(false)
+      setCommitOpen(true)
+    }
+  }, [])
+
   const handleUndo = useCallback(() => {
     const entry = undo()
     if (!entry) return
@@ -552,14 +603,14 @@ export default function App() {
   return (
     <div className="app-shell">
       <TriageTopBar
-        currentIndex={currentIndex}
+        currentIndex={activeIndex}
         mode={sessionMode}
-        onCommit={() => setCommitOpen(true)}
+        onCommit={handleCommitClick}
         onModeChange={handleModeChange}
         onOpenSettings={() => setSettingsOpen(true)}
         playlists={playlists}
         sourcePlaylistId={sourcePlaylistId}
-        trackCount={tracks.length}
+        trackCount={filteredTracks.length}
       />
 
       {sidecarError ? <div className="error-banner">{sidecarError}</div> : null}
@@ -611,7 +662,12 @@ export default function App() {
         colorId={colorId}
         keymap={keymap}
         leanDirection={leanDirection}
+        mode={sessionMode}
         showKeyboardHint={sessionMode === 'triage'}
+        showRightRail={showRightRail}
+        onToggleRightRail={() => setShowRightRail((s) => !s)}
+        queueFilter={queueFilter}
+        onFilterChange={setQueueFilter}
         onLeanChange={setLeanDirection}
         onCut={leanCut}
         onKeep={leanKeep}
@@ -619,11 +675,11 @@ export default function App() {
         onSelectTrack={handleDuplicateSelect}
         rating={rating}
         track={track}
-        tracks={tracks}
+        tracks={filteredTracks}
         centerContent={
           loading ? (
             <div className="empty-state">Loading…</div>
-          ) : !tracks.length ? (
+          ) : !filteredTracks.length ? (
             <div className="empty-state">Select a Rekordbox playlist to start cutting.</div>
           ) : sessionMode === 'triage' ? (
             track ? (
@@ -644,9 +700,9 @@ export default function App() {
               />
             ) : null
           ) : sessionMode === 'audit' ? (
-            <AuditView tracks={tracks} decisions={decisions} onSelectIndex={handleAuditSelect} />
+            <AuditView tracks={filteredTracks} decisions={decisions} onSelectIndex={handleAuditSelect} />
           ) : sessionMode === 'compare' ? (
-            <CompareView tracks={tracks} />
+            <CompareView tracks={filteredTracks} />
           ) : null
         }
       />
@@ -667,6 +723,39 @@ export default function App() {
       <CommitDialog open={commitOpen} onClose={() => setCommitOpen(false)} />
       <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <RekordboxWarningModal open={rbWarningOpen} onClose={() => setRbWarningOpen(false)} onRetry={handleRbWarningRetry} />
+    </div>
+  )
+}
+
+type RekordboxWarningModalProps = {
+  open: boolean
+  onClose: () => void
+  onRetry: () => void
+}
+
+export function RekordboxWarningModal({ open, onClose, onRetry }: RekordboxWarningModalProps) {
+  if (!open) return null
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ color: 'var(--cut)' }}>⚠️ Rekordbox is Running</h2>
+        <p>
+          Rekordbox is currently open. You must close Rekordbox before SongSwipe can safely make modifications to your <code>master.db</code> library database.
+        </p>
+        <p className="top-bar__meta">
+          Modifying the database while Rekordbox is open can lead to library corruption or lost changes.
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn--primary" onClick={onRetry}>
+            Check Again
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

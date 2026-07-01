@@ -7,7 +7,7 @@ type RuleSuggestionBannerProps = {
 }
 
 export function RuleSuggestionBanner({ rule, onAccept, onDismiss }: RuleSuggestionBannerProps) {
-  const actionLabel = rule.action === 'suggest_keep' ? 'Keep' : 'Cull'
+  const actionLabel = rule.action === 'suggest_keep' ? 'Keep' : 'Cut'
   return (
     <div className="rule-banner">
       <span>

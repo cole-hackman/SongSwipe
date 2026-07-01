@@ -5,7 +5,7 @@ import path from 'node:path'
 export type SessionData = {
   sourcePlaylistId?: string | null
   destinationPlaylistId?: string | null
-  cullPlaylistId?: string | null
+  cutPlaylistId?: string | null
   currentIndex?: number
   decisions?: Record<string, unknown>
   sessionMode?: 'triage' | 'audit' | 'compare'

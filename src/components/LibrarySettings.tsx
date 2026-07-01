@@ -5,17 +5,80 @@ import { useQueueStore } from '@/store/queue'
 import { useSettingsStore } from '@/store/settings'
 
 const DEFAULT_RULE: BatchRule = {
-  id: 'default-bpm-cull',
+  id: 'default-bpm-cut',
   enabled: false,
   field: 'bpm',
   op: 'lt',
   value: 110,
-  action: 'suggest_cull',
+  action: 'suggest_cut',
+}
+
+type NumberStepperProps = {
+  value: number
+  onChange: (value: number) => void
+  min?: number
+  max?: number
+  step?: number
+  id?: string
+}
+
+function NumberStepper({
+  value,
+  onChange,
+  min = 0,
+  max = Infinity,
+  step = 1,
+  id,
+}: NumberStepperProps) {
+  const handleDecrement = () => {
+    onChange(Math.max(min, value - step))
+  }
+
+  const handleIncrement = () => {
+    onChange(Math.min(max, value + step))
+  }
+
+  return (
+    <div className="number-stepper">
+      <button
+        type="button"
+        className="number-stepper__btn"
+        onClick={handleDecrement}
+        disabled={value <= min}
+        aria-label="Decrease value"
+      >
+        −
+      </button>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        className="number-stepper__input"
+        value={value}
+        onChange={(event) => {
+          const val = Number(event.target.value.replace(/\D/g, ''))
+          if (!isNaN(val)) {
+            onChange(Math.max(min, Math.min(max, val)))
+          }
+        }}
+      />
+      <button
+        type="button"
+        className="number-stepper__btn"
+        onClick={handleIncrement}
+        disabled={value >= max}
+        aria-label="Increase value"
+      >
+        +
+      </button>
+    </div>
+  )
 }
 
 export function LibrarySettings() {
   const dbPathOverride = useSettingsStore((s) => s.dbPathOverride)
-  const zeroRatingOnCull = useSettingsStore((s) => s.zeroRatingOnCull)
+  const zeroRatingOnCut = useSettingsStore((s) => s.zeroRatingOnCut)
   const prefetchAhead = useSettingsStore((s) => s.prefetchAhead)
   const prefetchBehind = useSettingsStore((s) => s.prefetchBehind)
   const autoPlay = useSettingsStore((s) => s.autoPlay)
@@ -24,7 +87,7 @@ export function LibrarySettings() {
   const waveformFastMode = useSettingsStore((s) => s.waveformFastMode)
   const batchRules = useSettingsStore((s) => s.batchRules)
   const setDbPathOverride = useSettingsStore((s) => s.setDbPathOverride)
-  const setZeroRatingOnCull = useSettingsStore((s) => s.setZeroRatingOnCull)
+  const setZeroRatingOnCut = useSettingsStore((s) => s.setZeroRatingOnCut)
   const setPrefetchAhead = useSettingsStore((s) => s.setPrefetchAhead)
   const setPrefetchBehind = useSettingsStore((s) => s.setPrefetchBehind)
   const setAutoPlay = useSettingsStore((s) => s.setAutoPlay)
@@ -34,8 +97,10 @@ export function LibrarySettings() {
   const setBatchRules = useSettingsStore((s) => s.setBatchRules)
   const gamepadEnabled = useSettingsStore((s) => s.gamepadEnabled)
   const midiEnabled = useSettingsStore((s) => s.midiEnabled)
+  const cuePlacementMode = useSettingsStore((s) => s.cuePlacementMode)
   const setGamepadEnabled = useSettingsStore((s) => s.setGamepadEnabled)
   const setMidiEnabled = useSettingsStore((s) => s.setMidiEnabled)
+  const setCuePlacementMode = useSettingsStore((s) => s.setCuePlacementMode)
   const loadPlaylists = useQueueStore((s) => s.loadPlaylists)
   const [draftPath, setDraftPath] = useState(dbPathOverride ?? '')
   const [status, setStatus] = useState<string | null>(null)
@@ -64,8 +129,8 @@ export function LibrarySettings() {
   }
 
   async function toggleZeroRating(checked: boolean) {
-    setZeroRatingOnCull(checked)
-    await writeSettings({ zeroRatingOnCull: checked })
+    setZeroRatingOnCut(checked)
+    await writeSettings({ zeroRatingOnCut: checked })
   }
 
   async function updatePrefetch(ahead: number, behind: number) {
@@ -105,6 +170,11 @@ export function LibrarySettings() {
     await writeSettings({ midiEnabled: checked })
   }
 
+  async function handleCueModeChange(mode: 'presets' | 'smart') {
+    setCuePlacementMode(mode)
+    await writeSettings({ cuePlacementMode: mode })
+  }
+
   return (
     <>
       <div className="panel-block">
@@ -120,26 +190,22 @@ export function LibrarySettings() {
         <label className="top-bar__meta" htmlFor="prefetch-ahead">
           Prefetch ahead
         </label>
-        <input
+        <NumberStepper
           id="prefetch-ahead"
-          className="input"
-          type="number"
           min={0}
           max={20}
           value={prefetchAhead}
-          onChange={(event) => void updatePrefetch(Number(event.target.value), prefetchBehind)}
+          onChange={(val) => void updatePrefetch(val, prefetchBehind)}
         />
         <label className="top-bar__meta" htmlFor="prefetch-behind">
           Prefetch behind
         </label>
-        <input
+        <NumberStepper
           id="prefetch-behind"
-          className="input"
-          type="number"
           min={0}
           max={10}
           value={prefetchBehind}
-          onChange={(event) => void updatePrefetch(prefetchAhead, Number(event.target.value))}
+          onChange={(val) => void updatePrefetch(prefetchAhead, val)}
         />
       </div>
       <div className="panel-block">
@@ -147,16 +213,12 @@ export function LibrarySettings() {
         <label className="top-bar__meta" htmlFor="waveform-bar-width">
           Bar width
         </label>
-        <input
+        <NumberStepper
           id="waveform-bar-width"
-          className="input"
-          type="number"
           min={1}
           max={6}
           value={waveformBarWidth}
-          onChange={(event) =>
-            void updateWaveform({ waveformBarWidth: Number(event.target.value) })
-          }
+          onChange={(val) => void updateWaveform({ waveformBarWidth: val })}
         />
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
@@ -176,6 +238,21 @@ export function LibrarySettings() {
         </label>
       </div>
       <div className="panel-block">
+        <h2>Cues</h2>
+        <label className="top-bar__meta" htmlFor="cue-placement-mode">
+          Cue Placement Mode
+        </label>
+        <select
+          id="cue-placement-mode"
+          className="input"
+          value={cuePlacementMode}
+          onChange={(event) => void handleCueModeChange(event.target.value as 'presets' | 'smart')}
+        >
+          <option value="presets">Fixed Metrical Presets (Intro/32/64/Outro)</option>
+          <option value="smart">Algorithmic Smart Detection (Librosa)</option>
+        </select>
+      </div>
+      <div className="panel-block">
         <h2>Controllers</h2>
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
@@ -183,7 +260,7 @@ export function LibrarySettings() {
             checked={gamepadEnabled}
             onChange={(event) => void toggleGamepad(event.target.checked)}
           />
-          <span>Gamepad (A=cull, B=keep, X=play)</span>
+          <span>Gamepad (A=cut, B=keep, X=play)</span>
         </label>
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
@@ -191,7 +268,7 @@ export function LibrarySettings() {
             checked={midiEnabled}
             onChange={(event) => void toggleMidi(event.target.checked)}
           />
-          <span>MIDI (C2=cull, D2=keep, E2=play)</span>
+          <span>MIDI (C2=cut, D2=keep, E2=play)</span>
         </label>
       </div>
       <div className="panel-block">
@@ -202,15 +279,13 @@ export function LibrarySettings() {
             checked={rule.enabled}
             onChange={(event) => void updateRule({ ...rule, enabled: event.target.checked })}
           />
-          <span>Suggest cull when BPM &lt;</span>
+          <span>Suggest cut when BPM &lt;</span>
         </label>
-        <input
-          className="input"
-          type="number"
+        <NumberStepper
+          min={40}
+          max={250}
           value={Number(rule.value ?? 110)}
-          onChange={(event) =>
-            void updateRule({ ...rule, value: Number(event.target.value), action: 'suggest_cull' })
-          }
+          onChange={(val) => void updateRule({ ...rule, value: val, action: 'suggest_cut' })}
         />
       </div>
       <div className="panel-block">
@@ -231,10 +306,10 @@ export function LibrarySettings() {
         <label className="panel-block" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input
             type="checkbox"
-            checked={zeroRatingOnCull}
+            checked={zeroRatingOnCut}
             onChange={(event) => void toggleZeroRating(event.target.checked)}
           />
-          <span>Set culled tracks to 0 stars on commit</span>
+          <span>Set cut tracks to 0 stars on commit</span>
         </label>
         {status ? <p className="top-bar__meta">{status}</p> : null}
       </div>

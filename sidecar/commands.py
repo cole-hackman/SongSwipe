@@ -319,7 +319,7 @@ def find_duplicates(playlist_id: str) -> list[dict[str, Any]]:
 def plan_commit(
     decisions: list[dict[str, Any]],
     default_dest_id: str | None = None,
-    default_cull_id: str | None = None,
+    default_cut_id: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     operations: list[dict[str, Any]] = []
     for item in decisions:
@@ -343,13 +343,13 @@ def plan_commit(
                     }
                 )
         else:
-            cull = item.get("cullPlaylistId") or default_cull_id
-            if cull:
+            cut = item.get("cutPlaylistId") or default_cut_id
+            if cut:
                 operations.append(
                     {
                         "type": "add_to_playlist",
                         "trackId": track_id,
-                        "playlistId": str(cull),
+                        "playlistId": str(cut),
                     }
                 )
     return {"operations": operations}
@@ -358,9 +358,9 @@ def plan_commit(
 def export_commit_xml(
     decisions: list[dict[str, Any]],
     default_dest_id: str | None = None,
-    default_cull_id: str | None = None,
+    default_cut_id: str | None = None,
 ) -> dict[str, Any]:
-    plan = plan_commit(decisions, default_dest_id, default_cull_id)
+    plan = plan_commit(decisions, default_dest_id, default_cut_id)
     db = open_db()
     titles: dict[str, str] = {}
     for item in decisions:
@@ -415,6 +415,31 @@ def add_to_playlist(playlist_id: str, track_id: str) -> dict[str, Any]:
     return {"ok": True, "skipped": False}
 
 
+def analyze_track_cues(track_path: str) -> list[float]:
+    if not os.path.exists(track_path):
+        return []
+    try:
+        import librosa
+        y, sr = librosa.load(track_path, sr=22050)
+        # Extract timbral features (MFCCs)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        # Partition audio into k contiguous clusters using Agglomerative Clustering
+        n_frames = mfcc.shape[1]
+        k = min(10, max(2, n_frames // 10))
+        bounds = librosa.segment.agglomerative(mfcc, k)
+        boundary_times = librosa.frames_to_time(bounds, sr=sr)
+        # Sort and filter boundaries to keep them at least 10 seconds apart
+        times = sorted([float(t) for t in boundary_times])
+        filtered_times = []
+        for t in times:
+            if not filtered_times or (t - filtered_times[-1]) >= 10.0:
+                filtered_times.append(t)
+        return filtered_times
+    except Exception as e:
+        print(f"Error analyzing track cues: {e}")
+        return []
+
+
 def dispatch(method: str, params: dict[str, Any] | None = None) -> Any:
     params = params or {}
     handlers = {
@@ -434,12 +459,12 @@ def dispatch(method: str, params: dict[str, Any] | None = None) -> Any:
         "plan_commit": lambda p: plan_commit(
             p["decisions"],
             p.get("defaultDestId"),
-            p.get("defaultCullId"),
+            p.get("defaultCutId"),
         ),
         "export_commit_xml": lambda p: export_commit_xml(
             p["decisions"],
             p.get("defaultDestId"),
-            p.get("defaultCullId"),
+            p.get("defaultCutId"),
         ),
         "list_backups": lambda _: list_backups(),
         "restore_backup": lambda p: restore_backup(p["backupPath"]),
@@ -447,6 +472,7 @@ def dispatch(method: str, params: dict[str, Any] | None = None) -> Any:
         "set_color": lambda p: set_color(p["trackId"], p["colorId"]),
         "create_playlist": lambda p: create_playlist(p["name"], p.get("parentId")),
         "add_to_playlist": lambda p: add_to_playlist(p["playlistId"], p["trackId"]),
+        "analyze_track_cues": lambda p: analyze_track_cues(p["trackPath"]),
         "close_db": lambda _: close_db() or {"ok": True},
     }
     if method not in handlers:

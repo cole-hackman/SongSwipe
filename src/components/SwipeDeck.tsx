@@ -5,17 +5,17 @@ import type { Track } from '@/lib/types'
 type SwipeDeckProps = {
   track: Track
   onKeep: () => void
-  onCull: () => void
+  onCut: () => void
 }
 
-export function SwipeDeck({ track, onKeep, onCull }: SwipeDeckProps) {
+export function SwipeDeck({ track, onKeep, onCut }: SwipeDeckProps) {
   return (
     <div className="swipe-area">
       <TinderCard
         key={track.id}
         onSwipe={(direction) => {
           if (direction === 'right') onKeep()
-          if (direction === 'left') onCull()
+          if (direction === 'left') onCut()
         }}
         preventSwipe={['up', 'down']}
       >

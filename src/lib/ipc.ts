@@ -1,5 +1,12 @@
 import type { AppSettingsPayload, NamedSessionMeta } from '@/lib/api'
 
+function requireApi() {
+  if (!window.api) {
+    throw new Error('SongSwipe API is unavailable')
+  }
+  return window.api
+}
+
 export function rb<T = unknown>(method: string, params: Record<string, unknown> = {}): Promise<T> {
   if (!window.api) {
     return Promise.reject(new Error('SongSwipe API is unavailable'))
@@ -8,35 +15,35 @@ export function rb<T = unknown>(method: string, params: Record<string, unknown> 
 }
 
 export async function ensureSidecarReady() {
-  return window.api.ensureSidecarReady()
+  return requireApi().ensureSidecarReady()
 }
 
 export async function getSidecarStatus() {
-  return window.api.sidecarStatus()
+  return requireApi().sidecarStatus()
 }
 
 export async function readSettings(): Promise<AppSettingsPayload> {
-  return window.api.readSettings()
+  return requireApi().readSettings()
 }
 
 export async function writeSettings(settings: AppSettingsPayload): Promise<AppSettingsPayload> {
-  return window.api.writeSettings(settings)
+  return requireApi().writeSettings(settings)
 }
 
 export async function toMediaUrl(filePath: string): Promise<string> {
-  return window.api.toFileUrl(filePath)
+  return requireApi().toFileUrl(filePath)
 }
 
 export async function fileExists(filePath: string): Promise<boolean> {
-  return window.api.fileExists(filePath)
+  return requireApi().fileExists(filePath)
 }
 
 export async function batchFileExists(paths: string[]): Promise<Record<string, boolean>> {
-  return window.api.batchFileExists(paths)
+  return requireApi().batchFileExists(paths)
 }
 
 export async function getCachedPeaks(filePath: string) {
-  return window.api.getCachedPeaks(filePath)
+  return requireApi().getCachedPeaks(filePath)
 }
 
 export async function saveCachedPeaks(
@@ -44,31 +51,31 @@ export async function saveCachedPeaks(
   peaks: number[][],
   duration: number,
 ): Promise<void> {
-  await window.api.saveCachedPeaks(filePath, peaks, duration)
+  await requireApi().saveCachedPeaks(filePath, peaks, duration)
 }
 
 export async function readSession<T>(): Promise<T | null> {
-  return (await window.api.readSession()) as T | null
+  return (await requireApi().readSession()) as T | null
 }
 
 export async function writeSession(data: unknown): Promise<void> {
-  await window.api.writeSession(data)
+  await requireApi().writeSession(data)
 }
 
 export async function listNamedSessions(): Promise<NamedSessionMeta[]> {
-  return window.api.listNamedSessions()
+  return requireApi().listNamedSessions()
 }
 
 export async function saveNamedSession(id: string, data: unknown): Promise<void> {
-  await window.api.saveNamedSession(id, data)
+  await requireApi().saveNamedSession(id, data)
 }
 
-export async function loadNamedSession<T>(id: string): Promise<T | null> {
-  return (await window.api.loadNamedSession(id)) as T | null
+export async function loadNamedSession<T>(id: string): Promise<T> {
+  return (await requireApi().loadNamedSession(id)) as T
 }
 
 export async function deleteNamedSession(id: string): Promise<void> {
-  await window.api.deleteNamedSession(id)
+  await requireApi().deleteNamedSession(id)
 }
 
 export async function exportTextFile(
@@ -76,5 +83,5 @@ export async function exportTextFile(
   contents: string,
   filters: Array<{ name: string; extensions: string[] }>,
 ): Promise<string | null> {
-  return window.api.exportTextFile(defaultName, contents, filters)
+  return requireApi().exportTextFile(defaultName, contents, filters)
 }

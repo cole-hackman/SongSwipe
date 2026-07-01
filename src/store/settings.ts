@@ -1,5 +1,10 @@
 import { create } from 'zustand'
 import { DEFAULT_KEYMAP, type KeyAction } from '@/lib/keymap'
+import {
+  DEFAULT_AUDIT_COLUMNS,
+  mergeAuditColumns,
+  type AuditColumnConfig,
+} from '@/lib/audit-columns'
 import type { BatchRule, SessionMode } from '@/lib/types'
 import type { AppSettingsPayload } from '@/lib/api'
 
@@ -7,9 +12,9 @@ type SettingsState = {
   prefetchAhead: number
   prefetchBehind: number
   destinationPlaylistId: string | null
-  cullPlaylistId: string | null
+  cutPlaylistId: string | null
   dbPathOverride: string | null
-  zeroRatingOnCull: boolean
+  zeroRatingOnCut: boolean
   autoPlay: boolean
   waveformBarWidth: number
   waveformNormalize: boolean
@@ -19,10 +24,14 @@ type SettingsState = {
   keymap: Record<KeyAction, string>
   gamepadEnabled: boolean
   midiEnabled: boolean
+  auditColumns: AuditColumnConfig[]
+  cuePlacementMode: 'presets' | 'smart'
+  setCuePlacementMode: (value: 'presets' | 'smart') => void
+  setAuditColumns: (columns: AuditColumnConfig[]) => void
   setDestinationPlaylistId: (id: string | null) => void
-  setCullPlaylistId: (id: string | null) => void
+  setCutPlaylistId: (id: string | null) => void
   setDbPathOverride: (path: string | null) => void
-  setZeroRatingOnCull: (value: boolean) => void
+  setZeroRatingOnCut: (value: boolean) => void
   setPrefetchAhead: (value: number) => void
   setPrefetchBehind: (value: number) => void
   setAutoPlay: (value: boolean) => void
@@ -41,9 +50,9 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   prefetchAhead: 5,
   prefetchBehind: 2,
   destinationPlaylistId: null,
-  cullPlaylistId: null,
+  cutPlaylistId: null,
   dbPathOverride: null,
-  zeroRatingOnCull: false,
+  zeroRatingOnCut: false,
   autoPlay: false,
   waveformBarWidth: 2,
   waveformNormalize: true,
@@ -53,10 +62,14 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   keymap: { ...DEFAULT_KEYMAP },
   gamepadEnabled: false,
   midiEnabled: false,
+  auditColumns: [...DEFAULT_AUDIT_COLUMNS],
+  cuePlacementMode: 'presets',
+  setCuePlacementMode: (value) => set({ cuePlacementMode: value }),
+  setAuditColumns: (columns) => set({ auditColumns: columns }),
   setDestinationPlaylistId: (id) => set({ destinationPlaylistId: id }),
-  setCullPlaylistId: (id) => set({ cullPlaylistId: id }),
+  setCutPlaylistId: (id) => set({ cutPlaylistId: id }),
   setDbPathOverride: (path) => set({ dbPathOverride: path }),
-  setZeroRatingOnCull: (value) => set({ zeroRatingOnCull: value }),
+  setZeroRatingOnCut: (value) => set({ zeroRatingOnCut: value }),
   setPrefetchAhead: (value) => set({ prefetchAhead: Math.max(0, value) }),
   setPrefetchBehind: (value) => set({ prefetchBehind: Math.max(0, value) }),
   setAutoPlay: (value) => set({ autoPlay: value }),
@@ -71,7 +84,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   hydrate: (settings) =>
     set({
       dbPathOverride: settings.dbPathOverride ?? null,
-      zeroRatingOnCull: settings.zeroRatingOnCull ?? false,
+      zeroRatingOnCut: settings.zeroRatingOnCut ?? false,
       prefetchAhead: settings.prefetchAhead ?? 5,
       prefetchBehind: settings.prefetchBehind ?? 2,
       autoPlay: settings.autoPlay ?? false,
@@ -83,6 +96,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       keymap: settings.keymap ?? { ...DEFAULT_KEYMAP },
       gamepadEnabled: settings.gamepadEnabled ?? false,
       midiEnabled: settings.midiEnabled ?? false,
+      auditColumns: mergeAuditColumns(settings.auditColumns as AuditColumnConfig[] | undefined),
+      cuePlacementMode: settings.cuePlacementMode ?? 'presets',
     }),
 }))
 

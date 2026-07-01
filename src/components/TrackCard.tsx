@@ -33,7 +33,7 @@ export function TrackCard({ track }: TrackCardProps) {
       <div>
         <PlaylistMembershipBadges
           inDest={membership?.inDest ?? false}
-          inCull={membership?.inCull ?? false}
+          inCut={membership?.inCut ?? false}
         />
         <h2 className="track-card__title">{track.title || 'Untitled'}</h2>
         <p className="track-card__artist">{track.artist || 'Unknown artist'}</p>

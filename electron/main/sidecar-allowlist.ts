@@ -18,5 +18,6 @@ export const ALLOWED_SIDECAR_METHODS = new Set([
   'set_color',
   'create_playlist',
   'add_to_playlist',
+  'analyze_track_cues',
   'close_db',
 ])

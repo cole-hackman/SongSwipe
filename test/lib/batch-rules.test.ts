@@ -17,10 +17,10 @@ const track = {
 }
 
 describe('evaluateRules', () => {
-  it('suggests cull when BPM below threshold', () => {
+  it('suggests cut when BPM below threshold', () => {
     const rules: BatchRule[] = [
-      { id: 'r1', enabled: true, field: 'bpm', op: 'lt', value: 110, action: 'suggest_cull' },
+      { id: 'r1', enabled: true, field: 'bpm', op: 'lt', value: 110, action: 'suggest_cut' },
     ]
-    expect(evaluateRules(track, rules)?.action).toBe('suggest_cull')
+    expect(evaluateRules(track, rules)?.action).toBe('suggest_cut')
   })
 })

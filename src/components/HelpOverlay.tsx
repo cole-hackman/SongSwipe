@@ -13,7 +13,7 @@ export function HelpOverlay({ open, onClose }: HelpOverlayProps) {
         <p className="top-bar__meta">Defaults — customize in Keyboard map settings.</p>
         <dl>
           <dt>← / →</dt>
-          <dd>Cull / Keep (Triage mode)</dd>
+          <dd>Cut / Keep (Triage mode)</dd>
           <dt>Space</dt>
           <dd>Play / Pause</dd>
           <dt>1-8</dt>
@@ -31,7 +31,7 @@ export function HelpOverlay({ open, onClose }: HelpOverlayProps) {
         </p>
         <h3>Controllers</h3>
         <p className="top-bar__meta">
-          Gamepad: A=cull, B=keep, X=play. MIDI: C2=cull, D2=keep, E2=play.
+          Gamepad: A=cut, B=keep, X=play. MIDI: C2=cut, D2=keep, E2=play.
         </p>
         <h3>Commit</h3>
         <p className="top-bar__meta">

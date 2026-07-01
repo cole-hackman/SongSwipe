@@ -1,9 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { createInterface } from 'node:readline'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { app } from 'electron'
+import {
+  describeMissingSidecarPath,
+  normalizeSidecarCallFailure,
+} from './sidecar-errors'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -37,6 +41,7 @@ function sidecarPaths(): { executable: string; args: string[]; cwd: string } {
     if (hasBinary) {
       return { executable: bundled, args: [], cwd: path.dirname(bundled) }
     }
+
     const python = path.join(resources, 'sidecar-venv', 'bin', 'python3')
     return { executable: python, args: [script], cwd: path.dirname(script) }
   }
@@ -49,10 +54,10 @@ function sidecarPaths(): { executable: string; args: string[]; cwd: string } {
 
 let dbPathOverride: string | null = null
 
-export function setSidecarDbPath(path: string | null): void {
-  dbPathOverride = path
-  if (path) {
-    process.env.SONGSWIPE_DB_PATH = path
+export function setSidecarDbPath(targetPath: string | null): void {
+  dbPathOverride = targetPath
+  if (targetPath) {
+    process.env.SONGSWIPE_DB_PATH = targetPath
   } else {
     delete process.env.SONGSWIPE_DB_PATH
   }
@@ -94,6 +99,18 @@ export function startSidecar(): void {
   lastStderr = ''
 
   const { executable, args, cwd } = sidecarPaths()
+  if (!existsSync(executable)) {
+    setStatus({ state: 'error', error: describeMissingSidecarPath('executable', executable) })
+    child = null
+    return
+  }
+
+  const script = args[0]
+  if (script && !existsSync(script)) {
+    setStatus({ state: 'error', error: describeMissingSidecarPath('script', script) })
+    child = null
+    return
+  }
 
   child = spawn(executable, args, {
     cwd,
@@ -110,8 +127,10 @@ export function startSidecar(): void {
         error?: { message: string }
       }
       if (payload.id == null) return
+
       const entry = pending.get(payload.id)
       if (!entry) return
+
       pending.delete(payload.id)
       if (payload.error) {
         entry.reject(new Error(payload.error.message))
@@ -146,6 +165,7 @@ export function startSidecar(): void {
         error: lastStderr.trim() || `Sidecar exited with code ${code ?? 'unknown'}`,
       })
     }
+
     child = null
     stoppingIntentionally = false
     for (const [, entry] of pending) {
@@ -157,13 +177,14 @@ export function startSidecar(): void {
 
 export async function ensureSidecarReady(timeoutMs = 5000): Promise<SidecarStatus> {
   if (!child) startSidecar()
+  if (status.state === 'error') return status
 
   try {
     await callSidecar('ping', {}, timeoutMs)
     setStatus({ state: 'ready' })
     return status
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Sidecar ping failed'
+    const message = normalizeSidecarCallFailure(error, lastStderr, 'Sidecar ping failed').message
     setStatus({ state: 'error', error: lastStderr.trim() || message })
     return status
   }
@@ -186,7 +207,7 @@ export function callSidecar<T = unknown>(
     startSidecar()
   }
   if (!child?.stdin.writable) {
-    return Promise.reject(new Error('Sidecar is not running'))
+    return Promise.reject(new Error(status.error ?? 'Sidecar is not running'))
   }
 
   const id = nextId++
@@ -213,7 +234,9 @@ export function callSidecar<T = unknown>(
       if (error) {
         clearTimeout(timer)
         pending.delete(id)
-        reject(error)
+        const normalized = normalizeSidecarCallFailure(error, lastStderr)
+        setStatus({ state: 'error', error: normalized.message })
+        reject(normalized)
       }
     })
   })

@@ -10,13 +10,29 @@ function barsToSeconds(bars: number, bpm: number | null): number {
 
 export function buildCuePresets(track: Track, cues: Cue[]): CuePreset[] {
   const bars32Sec = barsToSeconds(32, track.bpm)
-  const dropCue = cues.find((c) => /drop/i.test(c.name)) ?? cues[0]
+  const bars64Sec = barsToSeconds(64, track.bpm)
   const outroStart = Math.max(0, track.durationSec - bars32Sec)
 
   return [
     { id: 'intro', label: 'Intro', positionSec: 0 },
     { id: 'bars32', label: '32 bars', positionSec: Math.min(bars32Sec, track.durationSec) },
-    { id: 'drop', label: 'Drop', positionSec: dropCue?.positionSec ?? bars32Sec },
+    { id: 'bars64', label: '64 bars', positionSec: Math.min(bars64Sec, track.durationSec) },
     { id: 'outro', label: 'Outro', positionSec: outroStart },
   ]
+}
+
+export function getEffectivePresets(
+  track: Track,
+  cues: Cue[],
+  smartCues: Cue[] | undefined,
+  cuePlacementMode: 'presets' | 'smart'
+): CuePreset[] {
+  if (cuePlacementMode === 'smart' && smartCues && smartCues.length > 0) {
+    return smartCues.map((cue, index) => ({
+      id: `smart-${index}`,
+      label: cue.name,
+      positionSec: cue.positionSec,
+    }))
+  }
+  return buildCuePresets(track, cues)
 }

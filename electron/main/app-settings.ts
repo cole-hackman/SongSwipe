@@ -4,7 +4,7 @@ import path from 'node:path'
 
 export type AppSettings = {
   dbPathOverride?: string | null
-  zeroRatingOnCull?: boolean
+  zeroRatingOnCut?: boolean
   prefetchAhead?: number
   prefetchBehind?: number
   autoPlay?: boolean
@@ -17,12 +17,14 @@ export type AppSettings = {
     field: 'bpm' | 'rating' | 'key'
     op: 'lt' | 'gt' | 'eq' | 'empty'
     value?: string | number
-    action: 'suggest_keep' | 'suggest_cull'
+    action: 'suggest_keep' | 'suggest_cut'
   }>
   sessionMode?: 'triage' | 'audit' | 'compare'
   keymap?: Record<string, string>
   gamepadEnabled?: boolean
   midiEnabled?: boolean
+  auditColumns?: Array<{ id: string; visible: boolean; width: number }>
+  cuePlacementMode?: 'presets' | 'smart'
 }
 
 function settingsPath(): string {

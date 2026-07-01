@@ -25,7 +25,7 @@ export function RekordboxStatus() {
   if (running === null) return null
 
   return (
-    <span className={`rb-status ${running ? 'rb-status--open' : 'rb-status--closed'}`}>
+    <span className={`rb-status rb-status--plain ${running ? 'rb-status--open' : 'rb-status--closed'}`}>
       {running ? 'Rekordbox open' : 'Rekordbox closed'}
     </span>
   )

@@ -39,7 +39,7 @@ export type DuplicateCluster = {
 
 export type TrackMembership = {
   inDest: boolean
-  inCull: boolean
+  inCut: boolean
 }
 
 export type SessionMode = 'triage' | 'audit' | 'compare'
@@ -50,7 +50,7 @@ export type BatchRule = {
   field: 'bpm' | 'rating' | 'key'
   op: 'lt' | 'gt' | 'eq' | 'empty'
   value?: string | number
-  action: 'suggest_keep' | 'suggest_cull'
+  action: 'suggest_keep' | 'suggest_cut'
 }
 
 export type Cue = {
@@ -64,24 +64,24 @@ export type TrackDecision = {
   rating?: number
   colorId?: number
   destPlaylistId?: string
-  cullPlaylistId?: string
+  cutPlaylistId?: string
 }
 
 export type CommitSummary = {
   keepCount: number
-  cullCount: number
+  cutCount: number
   ratingCount: number
   colorCount: number
 }
 
 export const REKORDBOX_COLORS: Array<{ id: number; label: string; hex: string }> = [
   { id: 0, label: 'None', hex: '#2a2a2e' },
-  { id: 1, label: 'Pink', hex: '#ff5470' },
-  { id: 2, label: 'Red', hex: '#e84545' },
-  { id: 3, label: 'Orange', hex: '#f5a623' },
-  { id: 4, label: 'Yellow', hex: '#f7d154' },
-  { id: 5, label: 'Green', hex: '#00d4aa' },
-  { id: 6, label: 'Aqua', hex: '#3ddbd9' },
-  { id: 7, label: 'Blue', hex: '#5b8def' },
-  { id: 8, label: 'Purple', hex: '#a78bfa' },
+  { id: 1, label: 'Pink', hex: '#ff007f' },
+  { id: 2, label: 'Red', hex: '#ff0000' },
+  { id: 3, label: 'Orange', hex: '#ffa500' },
+  { id: 4, label: 'Yellow', hex: '#ffff00' },
+  { id: 5, label: 'Green', hex: '#00ff00' },
+  { id: 6, label: 'Aqua', hex: '#25fde9' },
+  { id: 7, label: 'Blue', hex: '#0000ff' },
+  { id: 8, label: 'Purple', hex: '#660099' },
 ]

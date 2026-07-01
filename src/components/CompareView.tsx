@@ -1,34 +1,116 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ComparePlayer } from '@/audio/compare-player'
-import { buildCuePresets } from '@/lib/cue-presets'
-import type { Cue, Track } from '@/lib/types'
+import { getEffectivePresets } from '@/lib/cue-presets'
+import type { Cue, Track, TrackDecision } from '@/lib/types'
+import { useDecisionsStore } from '@/store/decisions'
 import { useQueueStore } from '@/store/queue'
-import { CueButtons } from '@/components/CueButtons'
 import { SkipPresetButtons } from '@/components/SkipPresetButtons'
 import { TrackCard } from '@/components/TrackCard'
+import { WaveformPlayer } from '@/components/WaveformPlayer'
+import { useSettingsStore } from '@/store/settings'
 
 type CompareViewProps = {
   tracks: Track[]
 }
 
+function getFileFormat(path: string) {
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  const losslessList = ['wav', 'aiff', 'flac', 'alac', 'aif']
+  const isLossless = losslessList.includes(ext)
+  return { ext: ext.toUpperCase(), isLossless }
+}
+
+type CompareInsightsBarProps = {
+  trackA: Track | null
+  trackB: Track | null
+  cuesA: Cue[]
+  cuesB: Cue[]
+}
+
+function CompareInsightsBar({ trackA, trackB, cuesA, cuesB }: CompareInsightsBarProps) {
+  if (!trackA || !trackB) return null
+
+  const formatA = getFileFormat(trackA.path)
+  const formatB = getFileFormat(trackB.path)
+
+  const bpmA = trackA.bpm
+  const bpmB = trackB.bpm
+  const bpmMismatch = bpmA !== null && bpmB !== null && Math.abs(bpmA - bpmB) > 0.05
+
+  const keyA = trackA.key
+  const keyB = trackB.key
+  const keyMismatch = !!(keyA && keyB && keyA !== keyB)
+
+  return (
+    <div className="compare-insights-bar">
+      <div className="compare-insights-bar__side compare-insights-bar__side--a">
+        <span className={`compare-badge ${formatA.isLossless ? 'compare-badge--lossless' : 'compare-badge--lossy'}`}>
+          {formatA.ext}
+        </span>
+        <span className={`compare-badge ${bpmMismatch ? 'compare-badge--warn' : 'compare-badge--neutral'}`}>
+          {bpmA !== null ? `${bpmA.toFixed(1)} BPM` : 'No BPM'}
+        </span>
+        <span className={`compare-badge ${keyMismatch ? 'compare-badge--warn' : 'compare-badge--neutral'}`}>
+          {keyA || 'No Key'}
+        </span>
+        <span className="compare-badge compare-badge--neutral">
+          {cuesA.length} {cuesA.length === 1 ? 'Cue' : 'Cues'}
+        </span>
+      </div>
+      <div className="compare-insights-bar__vs">VS</div>
+      <div className="compare-insights-bar__side compare-insights-bar__side--b">
+        <span className="compare-badge compare-badge--neutral">
+          {cuesB.length} {cuesB.length === 1 ? 'Cue' : 'Cues'}
+        </span>
+        <span className={`compare-badge ${keyMismatch ? 'compare-badge--warn' : 'compare-badge--neutral'}`}>
+          {keyB || 'No Key'}
+        </span>
+        <span className={`compare-badge ${bpmMismatch ? 'compare-badge--warn' : 'compare-badge--neutral'}`}>
+          {bpmB !== null ? `${bpmB.toFixed(1)} BPM` : 'No BPM'}
+        </span>
+        <span className={`compare-badge ${formatB.isLossless ? 'compare-badge--lossless' : 'compare-badge--lossy'}`}>
+          {formatB.ext}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function CompareView({ tracks }: CompareViewProps) {
   const cuesByTrackId = useQueueStore((s) => s.cuesByTrackId)
+  const waveformBarWidth = useSettingsStore((s) => s.waveformBarWidth)
+  const waveformNormalize = useSettingsStore((s) => s.waveformNormalize)
+  const waveformFastMode = useSettingsStore((s) => s.waveformFastMode)
+  const destinationPlaylistId = useSettingsStore((s) => s.destinationPlaylistId)
+  const cutPlaylistId = useSettingsStore((s) => s.cutPlaylistId)
+  const decide = useDecisionsStore((s) => s.decide)
+  const decisions = useDecisionsStore((s) => s.decisions)
+  const cuePlacementMode = useSettingsStore((s) => s.cuePlacementMode)
+  const smartCuesByTrackId = useQueueStore((s) => s.smartCuesByTrackId)
   const [indexA, setIndexA] = useState(0)
   const [indexB, setIndexB] = useState(Math.min(1, Math.max(tracks.length - 1, 0)))
   const [playingSlot, setPlayingSlot] = useState<'a' | 'b' | null>(null)
+  const [activeSlot, setActiveSlot] = useState<'a' | 'b'>('a')
   const playerRef = useRef<ComparePlayer | null>(null)
+  const [, forceUpdate] = useState(0)
 
   const trackA = tracks[indexA] ?? null
   const trackB = tracks[indexB] ?? null
   const cuesA: Cue[] = trackA ? (cuesByTrackId[trackA.id] ?? []) : []
   const cuesB: Cue[] = trackB ? (cuesByTrackId[trackB.id] ?? []) : []
 
-  const presetsA = useMemo(() => (trackA ? buildCuePresets(trackA, cuesA) : []), [trackA, cuesA])
-  const presetsB = useMemo(() => (trackB ? buildCuePresets(trackB, cuesB) : []), [trackB, cuesB])
+  const presetsA = useMemo(() => {
+    return trackA ? getEffectivePresets(trackA, cuesA, smartCuesByTrackId[trackA.id], cuePlacementMode) : []
+  }, [trackA, cuesA, smartCuesByTrackId, cuePlacementMode])
+
+  const presetsB = useMemo(() => {
+    return trackB ? getEffectivePresets(trackB, cuesB, smartCuesByTrackId[trackB.id], cuePlacementMode) : []
+  }, [trackB, cuesB, smartCuesByTrackId, cuePlacementMode])
 
   useEffect(() => {
     const player = new ComparePlayer()
     playerRef.current = player
+    forceUpdate((n) => n + 1)
     return () => player.release()
   }, [])
 
@@ -65,12 +147,41 @@ export function CompareView({ tracks }: CompareViewProps) {
     setPlayingSlot(slot)
   }
 
+  function decideTrack(track: Track | null, index: number, keep: boolean) {
+    if (!track) return
+    decide(
+      track.id,
+      keep
+        ? {
+            keep: true,
+            rating: decisions[track.id]?.rating ?? track.rating,
+            colorId: decisions[track.id]?.colorId ?? track.colorId,
+            destPlaylistId: decisions[track.id]?.destPlaylistId ?? destinationPlaylistId ?? undefined,
+          }
+        : {
+            keep: false,
+            colorId: decisions[track.id]?.colorId ?? track.colorId,
+            cutPlaylistId: cutPlaylistId ?? undefined,
+          },
+      index,
+    )
+  }
+
   if (!tracks.length) {
     return <div className="empty-state">Select a playlist to compare tracks.</div>
   }
 
+  const mediaA = playerRef.current?.active('a') ?? null
+  const mediaB = playerRef.current?.active('b') ?? null
+
   return (
     <div className="compare-view">
+      <CompareInsightsBar
+        trackA={trackA}
+        trackB={trackB}
+        cuesA={cuesA}
+        cuesB={cuesB}
+      />
       <CompareColumn
         label="Track A"
         tracks={tracks}
@@ -82,6 +193,15 @@ export function CompareView({ tracks }: CompareViewProps) {
         cues={cuesA}
         presets={presetsA}
         onJump={(sec) => jump('a', sec)}
+        media={mediaA}
+        waveformBarWidth={waveformBarWidth}
+        waveformNormalize={waveformNormalize}
+        waveformFastMode={waveformFastMode}
+        decision={trackA ? decisions[trackA.id] : undefined}
+        onKeep={() => decideTrack(trackA, indexA, true)}
+        onCut={() => decideTrack(trackA, indexA, false)}
+        isActive={activeSlot === 'a'}
+        onFocus={() => setActiveSlot('a')}
       />
       <CompareColumn
         label="Track B"
@@ -94,6 +214,15 @@ export function CompareView({ tracks }: CompareViewProps) {
         cues={cuesB}
         presets={presetsB}
         onJump={(sec) => jump('b', sec)}
+        media={mediaB}
+        waveformBarWidth={waveformBarWidth}
+        waveformNormalize={waveformNormalize}
+        waveformFastMode={waveformFastMode}
+        decision={trackB ? decisions[trackB.id] : undefined}
+        onKeep={() => decideTrack(trackB, indexB, true)}
+        onCut={() => decideTrack(trackB, indexB, false)}
+        isActive={activeSlot === 'b'}
+        onFocus={() => setActiveSlot('b')}
       />
     </div>
   )
@@ -108,8 +237,17 @@ type CompareColumnProps = {
   playing: boolean
   onTogglePlay: () => void
   cues: Cue[]
-  presets: ReturnType<typeof buildCuePresets>
+  presets: ReturnType<typeof getEffectivePresets>
   onJump: (sec: number) => void
+  media: HTMLAudioElement | null
+  waveformBarWidth: number
+  waveformNormalize: boolean
+  waveformFastMode: boolean
+  decision: TrackDecision | undefined
+  onKeep: () => void
+  onCut: () => void
+  isActive?: boolean
+  onFocus?: () => void
 }
 
 function CompareColumn({
@@ -123,23 +261,91 @@ function CompareColumn({
   cues,
   presets,
   onJump,
+  media,
+  waveformBarWidth,
+  waveformNormalize,
+  waveformFastMode,
+  decision,
+  onKeep,
+  onCut,
+  isActive = false,
+  onFocus,
 }: CompareColumnProps) {
+  const decisionLabel = decision
+    ? decision.keep
+      ? 'Marked Keep'
+      : 'Marked Cut'
+    : 'No decision'
+
   return (
-    <section className="compare-column">
-      <h2>{label}</h2>
-      <select className="select" value={index} onChange={(e) => onIndexChange(Number(e.target.value))}>
-        {tracks.map((t, i) => (
-          <option key={t.id} value={i}>
-            {t.title || 'Untitled'}
-          </option>
-        ))}
-      </select>
-      {track ? <TrackCard track={track} /> : null}
-      <button type="button" className="btn" onClick={onTogglePlay}>
-        {playing ? 'Pause' : 'Play'}
-      </button>
-      <CueButtons cues={cues} onJump={onJump} />
-      <SkipPresetButtons presets={presets} onJump={onJump} />
+    <section
+      className={`compare-column${isActive ? ' compare-column--active' : ''}`}
+      onClick={onFocus}
+    >
+      <header className="compare-column__header">
+        <h2>
+          {isActive && <span className="compare-column__active-dot" />}
+          {label}
+        </h2>
+        <span className={`compare-column__status${decision ? (decision.keep ? ' is-keep' : ' is-cut') : ''}`}>
+          {decisionLabel}
+        </span>
+      </header>
+      <div className="compare-fused">
+        <div className="select-wrap">
+          <select
+            className="select select--themed"
+            value={index}
+            onChange={(e) => onIndexChange(Number(e.target.value))}
+          >
+            {tracks.map((t, i) => (
+              <option key={t.id} value={i}>
+                {t.title || 'Untitled'}
+              </option>
+            ))}
+          </select>
+        </div>
+        {track ? <TrackCard track={track} /> : null}
+      </div>
+      {track ? (
+        <WaveformPlayer
+          media={media}
+          filePath={track.path}
+          cues={cues}
+          durationSec={track.durationSec}
+          presets={presets}
+          barWidth={waveformBarWidth}
+          normalize={waveformNormalize}
+          fastMode={waveformFastMode}
+          className="compare-waveform"
+          height={96}
+          onSeek={(sec) => onJump(sec)}
+        />
+      ) : null}
+      <div className="compare-column__transport">
+        <button type="button" className="btn compare-column__play" onClick={onTogglePlay}>
+          {playing ? 'Pause' : 'Play'}
+        </button>
+        <SkipPresetButtons presets={presets} onJump={onJump} />
+      </div>
+      <div className="compare-column__decide">
+        <button
+          type="button"
+          className={`btn btn--cut${decision && !decision.keep ? ' is-active' : ''}`}
+          onClick={onCut}
+          disabled={!track}
+        >
+          Cut
+        </button>
+        <button
+          type="button"
+          className={`btn btn--keep${decision?.keep ? ' is-active' : ''}`}
+          onClick={onKeep}
+          disabled={!track}
+        >
+          Keep
+        </button>
+      </div>
     </section>
   )
 }

@@ -17,8 +17,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
+    "@fontsource/archivo": "^5.2.8",
     "@fontsource/bricolage-grotesque": "^5.2.10",
     "@fontsource/hanken-grotesk": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@react-spring/web": "^9.7.5",
     "@wavesurfer/react": "^1.0.12",

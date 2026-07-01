@@ -6,8 +6,8 @@ import { useSettingsStore } from '@/store/settings'
 type BundleTrack = Track & { cues?: Cue[] }
 
 async function enrichPlaylist(tracks: Track[]) {
-  const { destinationPlaylistId, cullPlaylistId } = useSettingsStore.getState()
-  const playlistIds = [destinationPlaylistId, cullPlaylistId].filter(Boolean) as string[]
+  const { destinationPlaylistId, cutPlaylistId } = useSettingsStore.getState()
+  const playlistIds = [destinationPlaylistId, cutPlaylistId].filter(Boolean) as string[]
   const paths = tracks.map((t) => t.path).filter(Boolean)
 
   const [existsMap, membership] = await Promise.all([
@@ -19,10 +19,10 @@ async function enrichPlaylist(tracks: Track[]) {
 
   const missingPaths = paths.filter((p) => !existsMap[p])
   const destSet = new Set(membership[destinationPlaylistId ?? ''] ?? [])
-  const cullSet = new Set(membership[cullPlaylistId ?? ''] ?? [])
+  const cutSet = new Set(membership[cutPlaylistId ?? ''] ?? [])
   const membershipByTrackId: Record<string, TrackMembership> = {}
   for (const t of tracks) {
-    membershipByTrackId[t.id] = { inDest: destSet.has(t.id), inCull: cullSet.has(t.id) }
+    membershipByTrackId[t.id] = { inDest: destSet.has(t.id), inCut: cutSet.has(t.id) }
   }
   useQueueStore.setState({ missingPaths, membershipByTrackId })
 }
@@ -32,6 +32,7 @@ type QueueState = {
   tracks: Track[]
   cues: Cue[]
   cuesByTrackId: Record<string, Cue[]>
+  smartCuesByTrackId: Record<string, Cue[]>
   missingPaths: string[]
   membershipByTrackId: Record<string, TrackMembership>
   currentIndex: number
@@ -52,6 +53,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   tracks: [],
   cues: [],
   cuesByTrackId: {},
+  smartCuesByTrackId: {},
   missingPaths: [],
   membershipByTrackId: {},
   currentIndex: 0,

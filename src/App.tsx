@@ -1,44 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AudioPool } from '@/audio/AudioPool'
+import { resolvePlaybackUrl } from '@/audio/playback'
 import { useGamepad } from '@/audio/useGamepad'
 import { useMidi } from '@/audio/useMidi'
-import { buildCuePresets } from '@/lib/cue-presets'
-import { evaluateRules } from '@/lib/batch-rules'
-import { resolveKeyAction } from '@/lib/keymap'
 import { AuditView } from '@/components/AuditView'
 import { CommitDialog } from '@/components/CommitDialog'
-import { ColorPicker } from '@/components/ColorPicker'
 import { CompareView } from '@/components/CompareView'
-import { CueButtons } from '@/components/CueButtons'
-import { DestinationPlaylist } from '@/components/DestinationPlaylist'
-import { DuplicatesPanel } from '@/components/DuplicatesPanel'
 import { HelpOverlay } from '@/components/HelpOverlay'
-import { KeymapSettings } from '@/components/KeymapSettings'
-import { LibrarySettings } from '@/components/LibrarySettings'
-import { ModeSwitcher } from '@/components/ModeSwitcher'
-import { NamedSessions } from '@/components/NamedSessions'
-import { PerTrackDestination } from '@/components/PerTrackDestination'
-import { PlaylistNav } from '@/components/PlaylistNav'
-import { RatingControl } from '@/components/RatingControl'
-import { RekordboxStatus } from '@/components/RekordboxStatus'
 import { RuleSuggestionBanner } from '@/components/RuleSuggestionBanner'
 import { SkipPresetButtons } from '@/components/SkipPresetButtons'
-import { StatsPanel } from '@/components/StatsPanel'
-import { SwipeDeck } from '@/components/SwipeDeck'
-import { TrackExtras } from '@/components/TrackExtras'
 import { TransportBar } from '@/components/TransportBar'
+import { TriageCardStack } from '@/components/triage/TriageCardStack'
+import { SettingsDrawer } from '@/components/triage/SettingsDrawer'
+import { TriageTopBar } from '@/components/triage/TriageTopBar'
+import { TriageView } from '@/components/triage/TriageView'
 import { UndoToast } from '@/components/UndoToast'
-import { WaveformPlayer } from '@/components/WaveformPlayer'
-import { resolvePlaybackUrl } from '@/audio/playback'
+import { evaluateRules } from '@/lib/batch-rules'
+import { getEffectivePresets } from '@/lib/cue-presets'
 import {
-  readSession,
+  ensureSidecarReady,
   getSidecarStatus,
-  readSettings,
   rb,
+  readSession,
+  readSettings,
   writeSession,
   writeSettings,
 } from '@/lib/ipc'
-import type { BeatMarker, DuplicateCluster, SessionMode } from '@/lib/types'
+import { resolveKeyAction } from '@/lib/keymap'
+import type { BeatMarker, DuplicateCluster, SessionMode, TrackDecision } from '@/lib/types'
 import { useDecisionsStore } from '@/store/decisions'
 import { useQueueStore } from '@/store/queue'
 import { useSettingsStore } from '@/store/settings'
@@ -46,69 +35,96 @@ import { useSettingsStore } from '@/store/settings'
 type SessionSnapshot = {
   sourcePlaylistId?: string | null
   destinationPlaylistId?: string | null
-  cullPlaylistId?: string | null
+  cutPlaylistId?: string | null
   currentIndex?: number
-  decisions?: Record<string, { keep: boolean; rating?: number; colorId?: number }>
+  decisions?: Record<string, TrackDecision>
   sessionMode?: SessionMode
 }
 
 export default function App() {
-  const tracks = useQueueStore((s) => s.tracks)
-  const cues = useQueueStore((s) => s.cues)
-  const currentIndex = useQueueStore((s) => s.currentIndex)
-  const error = useQueueStore((s) => s.error)
-  const loading = useQueueStore((s) => s.loading)
-  const missingPaths = useQueueStore((s) => s.missingPaths)
-  const sourcePlaylistId = useQueueStore((s) => s.sourcePlaylistId)
-  const currentTrack = useQueueStore((s) => s.currentTrack)
-  const next = useQueueStore((s) => s.next)
-  const setCurrentIndex = useQueueStore((s) => s.setCurrentIndex)
-  const selectPlaylist = useQueueStore((s) => s.selectPlaylist)
+  const playlists = useQueueStore((state) => state.playlists)
+  const tracks = useQueueStore((state) => state.tracks)
+  const cues = useQueueStore((state) => state.cues)
+  const currentIndex = useQueueStore((state) => state.currentIndex)
+  const error = useQueueStore((state) => state.error)
+  const loading = useQueueStore((state) => state.loading)
+  const missingPaths = useQueueStore((state) => state.missingPaths)
+  const sourcePlaylistId = useQueueStore((state) => state.sourcePlaylistId)
+  const smartCuesByTrackId = useQueueStore((state) => state.smartCuesByTrackId)
+  const currentTrack = useQueueStore((state) => state.currentTrack)
+  const next = useQueueStore((state) => state.next)
+  const setCurrentIndex = useQueueStore((state) => state.setCurrentIndex)
+  const loadPlaylists = useQueueStore((state) => state.loadPlaylists)
+  const selectPlaylist = useQueueStore((state) => state.selectPlaylist)
 
-  const hydrate = useDecisionsStore((s) => s.hydrate)
-  const decide = useDecisionsStore((s) => s.decide)
-  const patch = useDecisionsStore((s) => s.patch)
-  const undo = useDecisionsStore((s) => s.undo)
-  const getDecision = useDecisionsStore((s) => s.getForTrack)
-  const decisions = useDecisionsStore((s) => s.decisions)
+  const hydrate = useDecisionsStore((state) => state.hydrate)
+  const decide = useDecisionsStore((state) => state.decide)
+  const patch = useDecisionsStore((state) => state.patch)
+  const undo = useDecisionsStore((state) => state.undo)
+  const getDecision = useDecisionsStore((state) => state.getForTrack)
+  const decisions = useDecisionsStore((state) => state.decisions)
 
-  const prefetchAhead = useSettingsStore((s) => s.prefetchAhead)
-  const prefetchBehind = useSettingsStore((s) => s.prefetchBehind)
-  const destinationPlaylistId = useSettingsStore((s) => s.destinationPlaylistId)
-  const cullPlaylistId = useSettingsStore((s) => s.cullPlaylistId)
-  const autoPlay = useSettingsStore((s) => s.autoPlay)
-  const batchRules = useSettingsStore((s) => s.batchRules)
-  const sessionMode = useSettingsStore((s) => s.sessionMode)
-  const waveformBarWidth = useSettingsStore((s) => s.waveformBarWidth)
-  const waveformNormalize = useSettingsStore((s) => s.waveformNormalize)
-  const waveformFastMode = useSettingsStore((s) => s.waveformFastMode)
-  const keymap = useSettingsStore((s) => s.keymap)
-  const gamepadEnabled = useSettingsStore((s) => s.gamepadEnabled)
-  const midiEnabled = useSettingsStore((s) => s.midiEnabled)
-  const setDestinationPlaylistId = useSettingsStore((s) => s.setDestinationPlaylistId)
-  const setCullPlaylistId = useSettingsStore((s) => s.setCullPlaylistId)
-  const setSessionMode = useSettingsStore((s) => s.setSessionMode)
-  const hydrateSettings = useSettingsStore((s) => s.hydrate)
-  const zeroRatingOnCull = useSettingsStore((s) => s.zeroRatingOnCull)
+  const prefetchAhead = useSettingsStore((state) => state.prefetchAhead)
+  const prefetchBehind = useSettingsStore((state) => state.prefetchBehind)
+  const destinationPlaylistId = useSettingsStore((state) => state.destinationPlaylistId)
+  const cutPlaylistId = useSettingsStore((state) => state.cutPlaylistId)
+  const autoPlay = useSettingsStore((state) => state.autoPlay)
+  const batchRules = useSettingsStore((state) => state.batchRules)
+  const sessionMode = useSettingsStore((state) => state.sessionMode)
+  const cuePlacementMode = useSettingsStore((state) => state.cuePlacementMode)
+  const waveformBarWidth = useSettingsStore((state) => state.waveformBarWidth)
+  const waveformNormalize = useSettingsStore((state) => state.waveformNormalize)
+  const waveformFastMode = useSettingsStore((state) => state.waveformFastMode)
+  const keymap = useSettingsStore((state) => state.keymap)
+  const gamepadEnabled = useSettingsStore((state) => state.gamepadEnabled)
+  const midiEnabled = useSettingsStore((state) => state.midiEnabled)
+  const setDestinationPlaylistId = useSettingsStore((state) => state.setDestinationPlaylistId)
+  const setCutPlaylistId = useSettingsStore((state) => state.setCutPlaylistId)
+  const setSessionMode = useSettingsStore((state) => state.setSessionMode)
+  const hydrateSettings = useSettingsStore((state) => state.hydrate)
+  const zeroRatingOnCut = useSettingsStore((state) => state.zeroRatingOnCut)
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [toast, setToast] = useState('')
   const [commitOpen, setCommitOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [sidecarError, setSidecarError] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [audioError, setAudioError] = useState<string | null>(null)
+  const [sidecarError, setSidecarError] = useState<string | null>(null)
+  const [sidecarReady, setSidecarReady] = useState<boolean | null>(null)
+  const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([])
+  const [beatgrid, setBeatgrid] = useState<BeatMarker[]>([])
   const [playbackSec, setPlaybackSec] = useState(0)
   const [playbackDuration, setPlaybackDuration] = useState(0)
+  const [activeElement, setActiveElement] = useState<HTMLAudioElement | null>(null)
   const [dismissedRuleTrackIds, setDismissedRuleTrackIds] = useState<Set<string>>(new Set())
-  const [beatgrid, setBeatgrid] = useState<BeatMarker[]>([])
-  const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([])
+  const [leanDirection, setLeanDirection] = useState<'keep' | 'cut' | null>(null)
+  const [missingPathsDismissed, setMissingPathsDismissed] = useState<string | null>(null)
+  const [showRightRail, setShowRightRail] = useState(true)
+  const [rbWarningOpen, setRbWarningOpen] = useState(false)
+  const [queueFilter, setQueueFilter] = useState<'all' | 'keep' | 'cut'>('all')
 
+  const filteredTracks = useMemo(() => {
+    if (queueFilter === 'all') return tracks
+    return tracks.filter((t) => {
+      const d = decisions[t.id]
+      if (queueFilter === 'keep') return d?.keep === true
+      if (queueFilter === 'cut') return d?.keep === false
+      return false
+    })
+  }, [tracks, decisions, queueFilter])
+
+  // Ensure index is within range of filtered tracks
+  const activeIndex = useMemo(() => {
+    if (filteredTracks.length === 0) return 0
+    return Math.max(0, Math.min(currentIndex, filteredTracks.length - 1))
+  }, [currentIndex, filteredTracks])
+
+  const track = filteredTracks[activeIndex] ?? null
   const poolRef = useRef<AudioPool | null>(null)
-  const track = currentTrack()
-
-  const trackPathsKey = useMemo(() => tracks.map((t) => t.path).join('\0'), [tracks])
-
+  const trackPathsKey = useMemo(() => tracks.map((item) => item.path).join('|'), [tracks])
   const pool = useMemo(() => {
+    if (poolRef.current) return poolRef.current
     const instance = new AudioPool({
       ahead: prefetchAhead,
       behind: prefetchBehind,
@@ -118,11 +134,9 @@ export default function App() {
     return instance
   }, [prefetchAhead, prefetchBehind])
 
-  const cuePresets = useMemo(
-    () => (track ? buildCuePresets(track, cues) : []),
-    [track, cues],
-  )
-
+  const cuePresets = useMemo(() => {
+    return track ? getEffectivePresets(track, cues, smartCuesByTrackId[track.id], cuePlacementMode) : []
+  }, [track, cues, smartCuesByTrackId, cuePlacementMode])
   const activeRule = useMemo(() => {
     if (!track || dismissedRuleTrackIds.has(track.id)) return null
     return evaluateRules(track, batchRules)
@@ -130,44 +144,71 @@ export default function App() {
 
   useEffect(() => {
     void (async () => {
-      const settings = await readSettings()
-      hydrateSettings(settings)
+      try {
+        const settings = await readSettings()
+        hydrateSettings(settings)
+      } catch {
+        // Browser-only preview does not have the Electron preload bridge.
+      }
     })()
   }, [hydrateSettings])
 
   useEffect(() => {
     void (async () => {
-      const status = await getSidecarStatus()
-      if (status.state === 'error') {
-        setSidecarError(formatSidecarError(status.error, status.stderr))
+      try {
+        const readyStatus = await ensureSidecarReady()
+        if (readyStatus.state === 'error') {
+          const detail = await getSidecarStatus().catch(() => readyStatus)
+          setSidecarReady(false)
+          setSidecarError(formatSidecarError(detail.error, detail.stderr))
+          return
+        }
+
+        setSidecarReady(true)
+        setSidecarError(null)
+      } catch {
+        // Browser-only preview does not have the Electron preload bridge.
       }
     })()
   }, [])
 
   useEffect(() => {
+    if (sidecarReady !== true) return
+    void loadPlaylists()
+  }, [loadPlaylists, sidecarReady])
+
+  useEffect(() => {
+    if (sidecarReady == null) return
+
     void (async () => {
-      const session = await readSession<SessionSnapshot>()
-      if (!session) return
-      if (session.destinationPlaylistId) setDestinationPlaylistId(session.destinationPlaylistId)
-      if (session.cullPlaylistId) setCullPlaylistId(session.cullPlaylistId)
-      if (session.sessionMode) setSessionMode(session.sessionMode)
-      if (session.sourcePlaylistId) {
-        await selectPlaylist(session.sourcePlaylistId)
-        if (typeof session.currentIndex === 'number') {
-          setCurrentIndex(session.currentIndex)
+      try {
+        const session = await readSession<SessionSnapshot>()
+        if (!session) return
+
+        if (session.destinationPlaylistId) setDestinationPlaylistId(session.destinationPlaylistId)
+        if (session.cutPlaylistId) setCutPlaylistId(session.cutPlaylistId)
+        if (session.sessionMode) setSessionMode(session.sessionMode)
+        if (sidecarReady && session.sourcePlaylistId) {
+          await selectPlaylist(session.sourcePlaylistId)
+          if (typeof session.currentIndex === 'number') {
+            setCurrentIndex(session.currentIndex)
+          }
         }
-      }
-      if (session.decisions) {
-        hydrate(session.decisions)
+        if (session.decisions) {
+          hydrate(session.decisions)
+        }
+      } catch {
+        // Browser-only preview does not have the Electron preload bridge.
       }
     })()
   }, [
     hydrate,
     selectPlaylist,
-    setCullPlaylistId,
+    setCutPlaylistId,
     setCurrentIndex,
     setDestinationPlaylistId,
     setSessionMode,
+    sidecarReady,
   ])
 
   const dismissToast = useCallback(() => setToast(''), [])
@@ -181,17 +222,20 @@ export default function App() {
     if (loading || !tracks.length) return
     void pool
       .setTracks(
-        tracks.map((t) => ({ path: t.path })),
+        tracks.map((item) => ({ path: item.path })),
         currentIndex,
       )
       .catch(() => {
         // Preparation errors surface when the user presses play.
       })
-  }, [pool, trackPathsKey, loading])
+  }, [pool, trackPathsKey, loading, tracks, currentIndex])
 
   useEffect(() => {
     if (loading || !tracks.length) return
-    void pool.setCurrent(currentIndex).then(() => setIsPlaying(false))
+    void pool.setCurrent(currentIndex).then(() => {
+      setIsPlaying(false)
+      setActiveElement(pool.active())
+    })
   }, [pool, currentIndex, loading, tracks.length])
 
   useEffect(() => {
@@ -201,73 +245,163 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    setActiveElement(pool.active())
+  }, [track?.id])
+
+  useEffect(() => {
     if (!autoPlay || loading || !track) return
     void pool.play(currentIndex).then(
-      () => setIsPlaying(true),
+      () => {
+        setIsPlaying(true)
+        setActiveElement(pool.active())
+      },
       (error: unknown) => {
         setIsPlaying(false)
         setAudioError(error instanceof Error ? error.message : 'Playback failed')
       },
     )
-  }, [autoPlay, currentIndex, loading, pool, track?.id])
+  }, [autoPlay, currentIndex, loading, pool, track?.id, track])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       void writeSession({
         sourcePlaylistId,
         destinationPlaylistId,
-        cullPlaylistId,
+        cutPlaylistId,
         currentIndex,
         decisions,
         sessionMode,
       })
     }, 3000)
+
     return () => window.clearInterval(timer)
-  }, [cullPlaylistId, currentIndex, decisions, destinationPlaylistId, sessionMode, sourcePlaylistId])
+  }, [cutPlaylistId, currentIndex, decisions, destinationPlaylistId, sessionMode, sourcePlaylistId])
 
   useEffect(() => {
+    if (sidecarReady !== true) {
+      setBeatgrid([])
+      return
+    }
     if (!track) {
       setBeatgrid([])
       return
     }
+
     void rb<BeatMarker[]>('get_beatgrid', { trackId: track.id })
       .then(setBeatgrid)
       .catch(() => setBeatgrid([]))
-  }, [track?.id])
+  }, [sidecarReady, track?.id, track])
 
   useEffect(() => {
+    if (sidecarReady !== true) {
+      setDuplicateClusters([])
+      return
+    }
     if (!sourcePlaylistId) {
       setDuplicateClusters([])
       return
     }
+
     void rb<DuplicateCluster[]>('find_duplicates', { playlistId: sourcePlaylistId })
       .then(setDuplicateClusters)
       .catch(() => setDuplicateClusters([]))
-  }, [sourcePlaylistId])
+  }, [sidecarReady, sourcePlaylistId])
+
+  const analyzingTrackIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    const element = pool.active()
-    if (!element) return
-    const onTimeUpdate = () => {
-      setPlaybackSec(element.currentTime)
-      if (Number.isFinite(element.duration) && element.duration > 0) {
-        setPlaybackDuration(element.duration)
+    if (cuePlacementMode !== 'smart' || !tracks.length) return
+
+    const prefetchLimit = Math.min(currentIndex + 5, tracks.length)
+    for (let i = currentIndex; i < prefetchLimit; i++) {
+      const t = tracks[i]
+      if (!t) continue
+      if (!smartCuesByTrackId[t.id] && !analyzingTrackIds.current.has(t.id)) {
+        analyzingTrackIds.current.add(t.id)
+        void (async (track) => {
+          try {
+            const onsets = await rb<number[]>('analyze_track_cues', { trackPath: track.path })
+            const mappedCues = onsets.map((time, idx) => ({
+              name: `Cue ${idx + 1}`,
+              type: 0,
+              positionSec: time,
+            }))
+            useQueueStore.setState((s) => ({
+              smartCuesByTrackId: {
+                ...s.smartCuesByTrackId,
+                [track.id]: mappedCues,
+              },
+            }))
+          } catch (e) {
+            console.error('Error pre-fetching smart cues:', e)
+          } finally {
+            analyzingTrackIds.current.delete(track.id)
+          }
+        })(t)
       }
     }
-    element.addEventListener('timeupdate', onTimeUpdate)
+  }, [tracks, currentIndex, cuePlacementMode, smartCuesByTrackId])
+
+  useEffect(() => {
+    if (!activeElement) return
+
+    const onTimeUpdate = () => {
+      setPlaybackSec(activeElement.currentTime)
+      if (Number.isFinite(activeElement.duration) && activeElement.duration > 0) {
+        setPlaybackDuration(activeElement.duration)
+      }
+    }
+
+    activeElement.addEventListener('timeupdate', onTimeUpdate)
+    activeElement.addEventListener('durationchange', onTimeUpdate)
     onTimeUpdate()
-    return () => element.removeEventListener('timeupdate', onTimeUpdate)
-  }, [pool, currentIndex, track?.id])
+    return () => {
+      activeElement.removeEventListener('timeupdate', onTimeUpdate)
+      activeElement.removeEventListener('durationchange', onTimeUpdate)
+    }
+  }, [activeElement])
 
   useEffect(() => {
     setPlaybackSec(0)
     setPlaybackDuration(track?.durationSec ?? 0)
-  }, [track?.id, track?.durationSec])
+  }, [track?.id, track?.durationSec, track])
+
+  useEffect(() => {
+    setCurrentIndex(0)
+  }, [queueFilter, setCurrentIndex])
+
+  const handleCommitClick = useCallback(async () => {
+    try {
+      const running = await rb<boolean>('is_rekordbox_running')
+      if (running) {
+        setRbWarningOpen(true)
+      } else {
+        setCommitOpen(true)
+      }
+    } catch {
+      setCommitOpen(true)
+    }
+  }, [])
+
+  const handleRbWarningRetry = useCallback(async () => {
+    try {
+      const running = await rb<boolean>('is_rekordbox_running')
+      if (!running) {
+        setRbWarningOpen(false)
+        setCommitOpen(true)
+      } else {
+        alert('Rekordbox is still running. Please close it and try again.')
+      }
+    } catch {
+      setRbWarningOpen(false)
+      setCommitOpen(true)
+    }
+  }, [])
 
   const handleUndo = useCallback(() => {
     const entry = undo()
     if (!entry) return
-    const idx = tracks.findIndex((t) => t.id === entry.trackId)
+    const idx = tracks.findIndex((item) => item.id === entry.trackId)
     setCurrentIndex(idx >= 0 ? idx : entry.queueIndex)
     setToast('Undid last decision')
   }, [setCurrentIndex, tracks, undo])
@@ -288,7 +422,7 @@ export default function App() {
     next()
   }, [currentIndex, decide, destinationPlaylistId, getDecision, next, track])
 
-  const handleCull = useCallback(() => {
+  const handleCut = useCallback(() => {
     if (!track) return
     const existing = getDecision(track.id)
     decide(
@@ -297,21 +431,42 @@ export default function App() {
         keep: false,
         ...(existing?.rating != null
           ? { rating: existing.rating }
-          : zeroRatingOnCull
+          : zeroRatingOnCut
             ? { rating: 0 }
             : {}),
         ...(existing?.colorId != null ? { colorId: existing.colorId } : { colorId: track.colorId }),
-        cullPlaylistId: cullPlaylistId ?? undefined,
+        cutPlaylistId: cutPlaylistId ?? undefined,
       },
       currentIndex,
     )
-    setToast(`Culled ${track.title}`)
+    setToast(`Cut ${track.title}`)
     next()
-  }, [cullPlaylistId, currentIndex, decide, getDecision, next, track, zeroRatingOnCull])
+  }, [cutPlaylistId, currentIndex, decide, getDecision, next, track, zeroRatingOnCut])
+
+  const leanKeep = useCallback(() => {
+    setLeanDirection('keep')
+    handleKeep()
+  }, [handleKeep])
+
+  const leanCut = useCallback(() => {
+    setLeanDirection('cut')
+    handleCut()
+  }, [handleCut])
+
+  const seekTo = useCallback(
+    (seconds: number) => {
+      const safe = Math.max(0, seconds)
+      pool.seek(safe)
+      const element = pool.active()
+      setPlaybackSec(element ? element.currentTime : safe)
+    },
+    [pool],
+  )
 
   const togglePlay = useCallback(async () => {
     try {
       const active = await pool.ensureReady(currentIndex)
+      setActiveElement(active)
       if (active.paused) {
         await pool.play(currentIndex)
         setIsPlaying(true)
@@ -330,8 +485,9 @@ export default function App() {
     (positionSec: number) => {
       void (async () => {
         try {
-          await pool.ensureReady(currentIndex)
-          pool.seek(positionSec)
+          const active = await pool.ensureReady(currentIndex)
+          setActiveElement(active)
+          seekTo(positionSec)
           await pool.play(currentIndex)
           setIsPlaying(true)
           setAudioError(null)
@@ -341,7 +497,7 @@ export default function App() {
         }
       })()
     },
-    [currentIndex, pool],
+    [currentIndex, pool, seekTo],
   )
 
   const handleModeChange = useCallback(
@@ -353,12 +509,12 @@ export default function App() {
   )
 
   const handleInputAction = useCallback(
-    (action: 'keep' | 'cull' | 'play') => {
-      if (action === 'keep') handleKeep()
-      if (action === 'cull') handleCull()
+    (action: 'keep' | 'cut' | 'play') => {
+      if (action === 'keep') leanKeep()
+      if (action === 'cut') leanCut()
       if (action === 'play') void togglePlay()
     },
-    [handleCull, handleKeep, togglePlay],
+    [leanCut, leanKeep, togglePlay],
   )
 
   const handleAuditSelect = useCallback(
@@ -377,7 +533,7 @@ export default function App() {
 
   const handleDuplicateSelect = useCallback(
     (trackId: string) => {
-      const idx = tracks.findIndex((t) => t.id === trackId)
+      const idx = tracks.findIndex((item) => item.id === trackId)
       if (idx >= 0) setCurrentIndex(idx)
     },
     [setCurrentIndex, tracks],
@@ -397,33 +553,40 @@ export default function App() {
         setHelpOpen(true)
         return
       }
+
       if (action === 'undo') {
         if (event.metaKey || event.ctrlKey) return
         handleUndo()
         return
       }
+
       if (action === 'play') {
         event.preventDefault()
         void togglePlay()
         return
       }
+
       if (sessionMode !== 'triage') return
+
       if (action === 'keep') {
         event.preventDefault()
-        handleKeep()
+        leanKeep()
         return
       }
-      if (action === 'cull') {
+
+      if (action === 'cut') {
         event.preventDefault()
-        handleCull()
+        leanCut()
         return
       }
+
       if (action.startsWith('cue')) {
         const index = Number(action.replace('cue', '')) - 1
         const cue = cues[index]
         if (cue) jumpToCue(cue.positionSec)
         return
       }
+
       if (action.startsWith('rate') && track) {
         patch(track.id, { rating: Number(action.replace('rate', '')) })
       }
@@ -431,29 +594,39 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cues, handleCull, handleKeep, handleUndo, jumpToCue, keymap, patch, sessionMode, togglePlay, track])
+  }, [cues, handleUndo, jumpToCue, keymap, leanCut, leanKeep, patch, sessionMode, togglePlay, track])
 
   const activeDecision = track ? getDecision(track.id) : undefined
   const rating = activeDecision?.rating ?? track?.rating ?? 0
   const colorId = activeDecision?.colorId ?? track?.colorId ?? 0
-  const progressLabel = tracks.length ? `${currentIndex + 1} / ${tracks.length}` : '0 / 0'
 
   return (
     <div className="app-shell">
-      <header className="top-bar">
-        <h1>SongSwipe</h1>
-        <ModeSwitcher mode={sessionMode} onChange={handleModeChange} />
-        <RekordboxStatus />
-        <div className="top-bar__meta">{progressLabel}</div>
-        <button type="button" className="btn" onClick={() => setCommitOpen(true)}>
-          Commit
-        </button>
-      </header>
+      <TriageTopBar
+        currentIndex={activeIndex}
+        mode={sessionMode}
+        onCommit={handleCommitClick}
+        onModeChange={handleModeChange}
+        onOpenSettings={() => setSettingsOpen(true)}
+        playlists={playlists}
+        sourcePlaylistId={sourcePlaylistId}
+        trackCount={filteredTracks.length}
+      />
 
       {sidecarError ? <div className="error-banner">{sidecarError}</div> : null}
       {error ? <div className="error-banner">{formatLibraryError(error)}</div> : null}
-      {missingPaths.length > 0 ? (
-        <div className="error-banner">{missingPaths.length} track file(s) missing in this playlist.</div>
+      {missingPaths.length > 0 && missingPathsDismissed !== missingPaths.join('|') ? (
+        <div className="error-banner error-banner--dismissible">
+          <span>{missingPaths.length} track file(s) missing in playlist.</span>
+          <button
+            type="button"
+            className="error-banner__dismiss"
+            aria-label="Dismiss missing-files notice"
+            onClick={() => setMissingPathsDismissed(missingPaths.join('|'))}
+          >
+            ×
+          </button>
+        </div>
       ) : null}
       {audioError ? (
         <div className="error-banner error-banner--dismissible">
@@ -468,96 +641,80 @@ export default function App() {
           </button>
         </div>
       ) : null}
+
       {activeRule && sessionMode === 'triage' ? (
         <RuleSuggestionBanner
           rule={activeRule}
           onAccept={() => {
             if (activeRule.action === 'suggest_keep') handleKeep()
-            else handleCull()
+            else handleCut()
           }}
           onDismiss={() => {
             if (track) {
-              setDismissedRuleTrackIds((prev) => new Set(prev).add(track.id))
+              setDismissedRuleTrackIds((previous) => new Set(previous).add(track.id))
             }
           }}
         />
       ) : null}
 
-      <div className="main-layout">
-        <PlaylistNav />
-        <section className="center-panel">
-          {loading ? <div className="empty-state">Loading…</div> : null}
-          {!loading && !tracks.length ? (
-            <div className="empty-state">Select a Rekordbox playlist to start culling.</div>
-          ) : null}
-
-          {sessionMode === 'triage' && track ? (
-            <>
-              <SwipeDeck track={track} onKeep={handleKeep} onCull={handleCull} />
-              <WaveformPlayer
-                media={pool.active()}
-                filePath={track.path}
-                cues={cues}
+      <TriageView
+        clusters={duplicateClusters}
+        colorId={colorId}
+        keymap={keymap}
+        leanDirection={leanDirection}
+        mode={sessionMode}
+        showKeyboardHint={sessionMode === 'triage'}
+        showRightRail={showRightRail}
+        onToggleRightRail={() => setShowRightRail((s) => !s)}
+        queueFilter={queueFilter}
+        onFilterChange={setQueueFilter}
+        onLeanChange={setLeanDirection}
+        onCut={leanCut}
+        onKeep={leanKeep}
+        onOpenHelp={() => setHelpOpen(true)}
+        onSelectTrack={handleDuplicateSelect}
+        rating={rating}
+        track={track}
+        tracks={filteredTracks}
+        centerContent={
+          loading ? (
+            <div className="empty-state">Loading…</div>
+          ) : !filteredTracks.length ? (
+            <div className="empty-state">Select a Rekordbox playlist to start cutting.</div>
+          ) : sessionMode === 'triage' ? (
+            track ? (
+              <TriageCardStack
                 beatgrid={beatgrid}
-                barWidth={waveformBarWidth}
-                normalize={waveformNormalize}
+                cues={cues}
                 fastMode={waveformFastMode}
+                leanDirection={leanDirection}
+                media={pool.active()}
+                normalize={waveformNormalize}
+                onCut={leanCut}
+                onKeep={leanKeep}
+                onLean={setLeanDirection}
+                onSeek={seekTo}
+                presets={cuePresets}
+                track={track}
+                waveformBarWidth={waveformBarWidth}
               />
-            </>
-          ) : null}
+            ) : null
+          ) : sessionMode === 'audit' ? (
+            <AuditView tracks={filteredTracks} decisions={decisions} onSelectIndex={handleAuditSelect} />
+          ) : sessionMode === 'compare' ? (
+            <CompareView tracks={filteredTracks} />
+          ) : null
+        }
+      />
 
-          {sessionMode === 'audit' && tracks.length ? (
-            <AuditView tracks={tracks} decisions={decisions} onSelectIndex={handleAuditSelect} />
-          ) : null}
-
-          {sessionMode === 'compare' ? <CompareView tracks={tracks} /> : null}
-        </section>
-
-        <aside className="right-rail">
-          <DestinationPlaylist />
-          <StatsPanel />
-          <NamedSessions />
-          <DuplicatesPanel
-            clusters={duplicateClusters}
-            tracks={tracks}
-            onSelectTrack={handleDuplicateSelect}
-          />
-          <LibrarySettings />
-          <KeymapSettings />
-          {track && sessionMode === 'triage' ? (
-            <>
-              <TrackExtras track={track} />
-              <PerTrackDestination trackId={track.id} />
-              <RatingControl trackId={track.id} value={rating} />
-              <ColorPicker trackId={track.id} value={colorId} />
-              <div className="panel-block">
-                <h2>Actions</h2>
-                <div className="action-row">
-                  <button type="button" className="btn btn--cull" onClick={handleCull}>
-                    Cull
-                  </button>
-                  <button type="button" className="btn btn--keep" onClick={handleKeep}>
-                    Keep
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : null}
-        </aside>
-      </div>
-
-      {sessionMode === 'triage' ? (
+      {sessionMode !== 'compare' ? (
         <TransportBar
           isPlaying={isPlaying}
           currentSec={playbackSec}
           durationSec={playbackDuration || track?.durationSec || 0}
           onTogglePlay={() => void togglePlay()}
-          onSeek={(seconds) => {
-            pool.seek(seconds)
-            setPlaybackSec(seconds)
-          }}
+          onSeek={seekTo}
         >
-          <CueButtons cues={cues} onJump={jumpToCue} />
           <SkipPresetButtons presets={cuePresets} onJump={jumpToCue} />
         </TransportBar>
       ) : null}
@@ -565,6 +722,40 @@ export default function App() {
       <UndoToast message={toast} onDismiss={dismissToast} />
       <CommitDialog open={commitOpen} onClose={() => setCommitOpen(false)} />
       <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <RekordboxWarningModal open={rbWarningOpen} onClose={() => setRbWarningOpen(false)} onRetry={handleRbWarningRetry} />
+    </div>
+  )
+}
+
+type RekordboxWarningModalProps = {
+  open: boolean
+  onClose: () => void
+  onRetry: () => void
+}
+
+export function RekordboxWarningModal({ open, onClose, onRetry }: RekordboxWarningModalProps) {
+  if (!open) return null
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ color: 'var(--cut)' }}>⚠️ Rekordbox is Running</h2>
+        <p>
+          Rekordbox is currently open. You must close Rekordbox before SongSwipe can safely make modifications to your <code>master.db</code> library database.
+        </p>
+        <p className="top-bar__meta">
+          Modifying the database while Rekordbox is open can lead to library corruption or lost changes.
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn--primary" onClick={onRetry}>
+            Check Again
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -579,7 +770,7 @@ function formatSidecarError(error?: string, stderr?: string): string {
 
 function formatLibraryError(message: string): string {
   if (/master\.db|SONGSWIPE_DB_PATH|unlock|sqlcipher/i.test(message)) {
-    return `Rekordbox library unavailable. Ensure Rekordbox 7 is installed, quit Rekordbox while SongSwipe reads the library, or set SONGSWIPE_DB_PATH to your master.db copy. ${message}`
+    return `Rekordbox library unavailable. Ensure Rekordbox 7 is installed, quit Rekordbox while SongSwipe reads the library, or set SONGSWIPE_DB_PATH to a master.db copy. ${message}`
   }
   return message
 }

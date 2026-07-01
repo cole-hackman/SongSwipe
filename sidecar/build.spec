@@ -16,6 +16,8 @@ a = Analysis(
         'bidict',
         'construct',
         'sqlalchemy',
+        'librosa',
+        'soundfile',
     ],
     hookspath=[],
     hooksconfig={},

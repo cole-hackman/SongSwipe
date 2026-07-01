@@ -21,7 +21,7 @@ export function StatsPanel() {
     <div className="panel-block stats-panel">
       <h2>Session stats</h2>
       <p>
-        {stats.keepCount} keep · {stats.cullCount} cull · {(stats.keepRatio * 100).toFixed(0)}%
+        {stats.keepCount} keep · {stats.cutCount} cut · {(stats.keepRatio * 100).toFixed(0)}%
         keep rate
       </p>
       {stats.avgBpmKeepers != null ? (

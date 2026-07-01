@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   buildPlaylistTree,
   collectFolderAncestorIds,
@@ -48,7 +48,7 @@ function PlaylistTreeNode({
       <div className="playlist-nav__branch">
         <button
           type="button"
-          className="playlist-nav__folder"
+          className="playlist-nav__folder playlist-nav__folder--styled"
           style={{ paddingLeft: `${depth * 14 + 10}px` }}
           aria-expanded={isOpen}
           onClick={() => onToggleFolder(node.id)}
@@ -89,7 +89,11 @@ function PlaylistTreeNode({
   )
 }
 
-export function PlaylistNav() {
+type PlaylistNavProps = {
+  searchQuery?: string
+}
+
+export function PlaylistNav({ searchQuery = '' }: PlaylistNavProps) {
   const playlists = useQueueStore((s) => s.playlists)
   const sourcePlaylistId = useQueueStore((s) => s.sourcePlaylistId)
   const loadPlaylists = useQueueStore((s) => s.loadPlaylists)
@@ -127,6 +131,38 @@ export function PlaylistNav() {
     })
   }
 
+  const matchesSearch = useCallback(
+    (node: PlaylistNode): boolean => {
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase()
+      if (node.name.toLowerCase().includes(q)) return true
+      if (node.isFolder) return node.children.some((child) => matchesSearch(child))
+      return false
+    },
+    [searchQuery],
+  )
+
+  const filteredTree = useMemo(() => {
+    if (!searchQuery.trim()) return tree
+    return tree.filter((node) => matchesSearch(node))
+  }, [tree, searchQuery, matchesSearch])
+
+  const searchExpanded = useMemo(() => {
+    if (!searchQuery.trim()) return expanded
+    // When searching, auto-expand all folders that have matching descendants
+    const autoExpand = new Set(expanded)
+    function expandMatching(nodes: PlaylistNode[]) {
+      for (const node of nodes) {
+        if (node.isFolder && matchesSearch(node)) {
+          autoExpand.add(node.id)
+          expandMatching(node.children)
+        }
+      }
+    }
+    expandMatching(tree)
+    return autoExpand
+  }, [searchQuery, expanded, tree, matchesSearch])
+
   return (
     <nav className="playlist-nav" aria-label="Playlists">
       <div className="playlist-nav__header">
@@ -134,16 +170,18 @@ export function PlaylistNav() {
       </div>
       <div className="playlist-nav__tree">
         {error ? <p className="playlist-nav__message">{error}</p> : null}
-        {!error && !tree.length ? (
-          <p className="playlist-nav__message">{loading ? 'Loading…' : 'No playlists found.'}</p>
+        {!error && !filteredTree.length ? (
+          <p className="playlist-nav__message">
+            {loading ? 'Loading…' : searchQuery ? 'No matching playlists.' : 'No playlists found.'}
+          </p>
         ) : null}
-        {tree.map((node) => (
+        {filteredTree.map((node) => (
           <PlaylistTreeNode
             key={node.id}
             node={node}
             depth={0}
             selectedId={sourcePlaylistId}
-            expanded={expanded}
+            expanded={searchQuery.trim() ? searchExpanded : expanded}
             loading={loading}
             onToggleFolder={toggleFolder}
             onSelectPlaylist={(playlistId) => void selectPlaylist(playlistId)}

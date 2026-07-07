@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { rb } from '@/lib/ipc'
-import type { Track } from '@/lib/types'
+import type { AssignedTag, Track } from '@/lib/types'
 
 export function TrackExtras({ track }: { track: Track }) {
-  const [tags, setTags] = useState<string[]>([])
+  const [tags, setTags] = useState<AssignedTag[]>([])
 
   useEffect(() => {
     let active = true
-    void rb<string[]>('get_my_tags', { trackId: track.id })
-      .then((names) => {
-        if (active) setTags(names)
+    void rb<AssignedTag[]>('get_my_tags', { trackId: track.id })
+      .then((assigned) => {
+        if (active) setTags(assigned)
       })
       .catch(() => {
         if (active) setTags([])
@@ -31,8 +31,8 @@ export function TrackExtras({ track }: { track: Track }) {
       {tags.length ? (
         <div className="track-extras__tags">
           {tags.map((tag) => (
-            <span key={tag} className="badge">
-              {tag}
+            <span key={tag.id} className="badge">
+              {tag.name}
             </span>
           ))}
         </div>

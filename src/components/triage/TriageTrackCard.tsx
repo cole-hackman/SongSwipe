@@ -3,7 +3,7 @@ import { getArtworkUrl } from '@/audio/artwork-cache'
 import { PlaylistMembershipBadges } from '@/components/PlaylistMembershipBadges'
 import { rb, toMediaUrl } from '@/lib/ipc'
 import type { CuePreset } from '@/lib/cue-presets'
-import type { BeatMarker, Cue, Track } from '@/lib/types'
+import type { AssignedTag, BeatMarker, Cue, Track } from '@/lib/types'
 import { useQueueStore } from '@/store/queue'
 import { WaveformPlayer } from '@/components/WaveformPlayer'
 
@@ -33,7 +33,7 @@ export function TriageTrackCard({
   waveformBarWidth,
 }: TriageTrackCardProps) {
   const [artUrl, setArtUrl] = useState<string | null>(null)
-  const [tags, setTags] = useState<string[]>([])
+  const [tags, setTags] = useState<AssignedTag[]>([])
   const membership = useQueueStore((state) => state.membershipByTrackId[track.id])
 
   useEffect(() => {
@@ -48,9 +48,9 @@ export function TriageTrackCard({
 
   useEffect(() => {
     let active = true
-    void rb<string[]>('get_my_tags', { trackId: track.id })
-      .then((names) => {
-        if (active) setTags(names)
+    void rb<AssignedTag[]>('get_my_tags', { trackId: track.id })
+      .then((assigned) => {
+        if (active) setTags(assigned)
       })
       .catch(() => {
         if (active) setTags([])
@@ -89,7 +89,7 @@ export function TriageTrackCard({
             {track.lastPlayed ? <span>Last {formatDate(track.lastPlayed)}</span> : null}
             {track.comment ? <span>{track.comment}</span> : null}
             {tags.map((tag) => (
-              <span key={tag} className="badge">{tag}</span>
+              <span key={tag.id} className="badge">{tag.name}</span>
             ))}
           </div>
         </div>

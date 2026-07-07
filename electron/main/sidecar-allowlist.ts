@@ -10,6 +10,8 @@ export const ALLOWED_SIDECAR_METHODS = new Set([
   'get_playlist_membership',
   'get_cues',
   'get_my_tags',
+  'get_my_tag_tree',
+  'set_my_tags',
   'get_beatgrid',
   'find_duplicates',
   'plan_commit',

@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { rb } from '@/lib/ipc'
-import { REKORDBOX_COLORS, type DuplicateCluster, type Track } from '@/lib/types'
+import {
+  REKORDBOX_COLORS,
+  type AssignedTag,
+  type DuplicateCluster,
+  type MyTagCategory,
+  type Track,
+} from '@/lib/types'
 import { computeSessionStats } from '@/lib/session-stats'
 import { useDecisionsStore } from '@/store/decisions'
 import { useQueueStore } from '@/store/queue'
@@ -69,8 +75,55 @@ export function TriageDecisionRail({
   const [newPlaylistName, setNewPlaylistName] = useState('')
   const [createStatus, setCreateStatus] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [tagTree, setTagTree] = useState<MyTagCategory[]>([])
+  const [currentTagIds, setCurrentTagIds] = useState<string[]>([])
 
   const decision = track ? decisions[track.id] : undefined
+
+  useEffect(() => {
+    let active = true
+    void rb<MyTagCategory[]>('get_my_tag_tree')
+      .then((tree) => {
+        if (active) setTagTree(tree)
+      })
+      .catch(() => {
+        if (active) setTagTree([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!track) {
+      setCurrentTagIds([])
+      return
+    }
+    let active = true
+    void rb<AssignedTag[]>('get_my_tags', { trackId: track.id })
+      .then((assigned) => {
+        if (active) setCurrentTagIds(assigned.map((tag) => tag.id))
+      })
+      .catch(() => {
+        if (active) setCurrentTagIds([])
+      })
+    return () => {
+      active = false
+    }
+  }, [track?.id])
+
+  // The picker starts from what Rekordbox already has assigned; once the user
+  // edits, the decision holds the desired set (only edited tracks get written).
+  const selectedTagIds = decision?.myTagIds ?? currentTagIds
+
+  function toggleTag(tagId: string) {
+    if (!track) return
+    const base = decision?.myTagIds ?? currentTagIds
+    const next = base.includes(tagId)
+      ? base.filter((id) => id !== tagId)
+      : [...base, tagId]
+    patch(track.id, { myTagIds: next, keep: decision?.keep ?? true })
+  }
   const keepOverride = decision?.destPlaylistId ?? ''
   const leafPlaylists = useMemo(
     () => playlists.filter((playlist) => !playlist.isFolder && !playlist.isSmart),
@@ -235,6 +288,35 @@ export function TriageDecisionRail({
           ))}
         </div>
       </section>
+
+      {tagTree.length > 0 ? (
+        <section className="triage-rail-card">
+          <h2>My Tags</h2>
+          <div className="triage-mytags">
+            {tagTree.map((category) => (
+              <div key={category.id} className="triage-mytags__cat">
+                <span className="triage-mytags__cat-name">{category.name}</span>
+                <div className="triage-mytags__chips">
+                  {category.tags.map((tag) => {
+                    const active = selectedTagIds.includes(tag.id)
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        className={`triage-mytag-chip${active ? ' is-active' : ''}`}
+                        aria-pressed={active}
+                        onClick={() => toggleTag(tag.id)}
+                      >
+                        {tag.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="triage-destination-list">
         <button

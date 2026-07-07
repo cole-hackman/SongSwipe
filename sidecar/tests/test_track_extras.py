@@ -1,4 +1,5 @@
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import commands
@@ -38,14 +39,15 @@ def test_track_dict_includes_comment_and_play_count():
 
 
 @patch("commands.open_db")
-def test_get_my_tags_returns_tag_names(mock_open_db):
+def test_get_my_tags_returns_assigned_tags(mock_open_db):
     db = MagicMock()
     mock_open_db.return_value = db
-    tag = MagicMock(ID="tag-1", Name="Peak Hour")
-    song = MagicMock(ContentID="track-1")
+    tag = SimpleNamespace(ID="tag-1", Name="Peak Hour", Attribute=0, ParentID="1", Seq=1)
     db.get_my_tag.return_value = [tag]
-    db.get_my_tag_songs.return_value = [song]
+    db.query.return_value.filter_by.return_value.all.return_value = [
+        SimpleNamespace(MyTagID="tag-1"),
+    ]
 
     tags = commands.get_my_tags("track-1")
 
-    assert tags == ["Peak Hour"]
+    assert tags == [{"id": "tag-1", "name": "Peak Hour"}]

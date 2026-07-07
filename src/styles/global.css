@@ -21,10 +21,7 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(900px 500px at 78% -8%, rgba(94, 234, 212, 0.06), transparent 60%),
-    radial-gradient(800px 600px at 0% 110%, rgba(251, 113, 133, 0.05), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 14px;
@@ -133,7 +130,8 @@ button {
 }
 
 .playlist-nav__item.is-selected {
-  background: color-mix(in srgb, var(--keep) 14%, var(--elevated));
+  background: color-mix(in srgb, var(--accent) 16%, var(--elevated));
+  box-shadow: inset 2px 0 0 var(--accent);
   color: var(--text);
 }
 
@@ -252,9 +250,9 @@ button {
 }
 
 .btn--primary {
-  background: var(--keep);
-  border-color: var(--keep);
-  color: #04110d;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #eaf3fb;
   font-weight: 600;
 }
 
@@ -317,7 +315,7 @@ button {
   gap: 18px;
   padding: 15px 26px;
   border-top: 1px solid var(--line);
-  background: linear-gradient(0deg, var(--bg-2), transparent);
+  background: var(--bg-2);
   position: relative;
   z-index: 10;
 }
@@ -353,7 +351,7 @@ button {
 .transport-seek {
   flex: 1 1 auto;
   min-width: 0;
-  accent-color: var(--keep);
+  accent-color: var(--accent);
 }
 
 .cue-buttons {
@@ -622,8 +620,8 @@ button {
 }
 
 .audit-th.is-drag-over {
-  background: color-mix(in srgb, var(--keep) 12%, var(--panel));
-  box-shadow: inset 2px 0 0 var(--keep);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .audit-th__resize {
@@ -687,9 +685,9 @@ button {
   min-width: 200px;
   padding: 6px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   font-family: var(--font-ui);
 }
 
@@ -839,14 +837,14 @@ button {
 
 .compare-column__status.is-keep {
   color: var(--keep);
-  border-color: rgba(94, 234, 212, 0.4);
-  background: rgba(94, 234, 212, 0.08);
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .compare-column__status.is-cut {
   color: var(--cut);
-  border-color: rgba(251, 113, 133, 0.4);
-  background: rgba(251, 113, 133, 0.08);
+  border-color: rgba(224, 72, 61, 0.4);
+  background: rgba(224, 72, 61, 0.12);
 }
 
 .compare-column__transport {
@@ -902,7 +900,7 @@ button {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 10px 32px 10px 12px;
   font-family: var(--font-ui);
   font-size: 14px;
@@ -933,7 +931,7 @@ button {
   align-items: center;
   gap: 16px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
   border: 1px solid var(--line);
   box-sizing: border-box;
@@ -978,8 +976,8 @@ button {
 
 .compare-badge--lossless {
   color: var(--keep);
-  background: rgba(94, 234, 212, 0.08);
-  border-color: rgba(94, 234, 212, 0.2);
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.2);
 }
 
 .compare-badge--lossy {
@@ -990,8 +988,8 @@ button {
 
 .compare-badge--warn {
   color: var(--cut);
-  background: rgba(251, 113, 133, 0.08);
-  border-color: rgba(251, 113, 133, 0.2);
+  background: rgba(224, 72, 61, 0.12);
+  border-color: rgba(224, 72, 61, 0.2);
 }
 
 .compare-badge--neutral {
@@ -1058,8 +1056,8 @@ button {
 }
 
 .keymap-row__binding.is-listening {
-  border-color: var(--keep);
-  background: rgba(94, 234, 212, 0.08);
+  border-color: var(--accent);
+  background: rgba(59, 158, 239, 0.1);
   color: var(--keep);
 }
 
@@ -1129,7 +1127,7 @@ button {
   gap: 0;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
 }
 
@@ -1151,8 +1149,8 @@ button {
 }
 
 .audit-filter-pill__btn.is-active {
-  background: color-mix(in srgb, var(--keep) 15%, var(--elevated));
-  color: var(--keep);
+  background: color-mix(in srgb, var(--accent) 15%, var(--elevated));
+  color: var(--accent);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1182,8 +1180,8 @@ button {
 
 .compare-column--active {
   opacity: 1;
-  border-top-color: var(--keep);
-  box-shadow: 0 -8px 16px -8px rgba(94, 234, 212, 0.4);
+  border-top-color: var(--accent);
+  box-shadow: none;
 }
 
 .compare-column--active .compare-column__header h2 {
@@ -1196,9 +1194,8 @@ button {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--keep);
+  background-color: var(--accent);
   margin-right: 8px;
-  box-shadow: 0 0 8px var(--keep);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1231,7 +1228,7 @@ button {
   border: 1px solid var(--line-2);
   border-bottom-width: 3px;
   border-radius: 6px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: var(--panel-2);
   color: var(--txt-2);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1280,7 +1277,7 @@ button {
   width: 14px;
   height: 14px;
   cursor: pointer;
-  accent-color: var(--keep);
+  accent-color: var(--accent);
   margin: 0;
   vertical-align: middle;
 }
@@ -1413,7 +1410,7 @@ button {
   flex-direction: column;
   gap: 10px;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
   border: 1px solid var(--line);
   box-sizing: border-box;

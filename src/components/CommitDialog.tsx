@@ -130,6 +130,9 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
           if (decision.colorId != null) {
             await rb('set_color', { trackId, colorId: decision.colorId })
           }
+          if (decision.myTagIds != null) {
+            await rb('set_my_tags', { trackId, tagIds: decision.myTagIds })
+          }
           if (decision.keep) {
             const destId = decision.destPlaylistId ?? destinationPlaylistId
             if (destId) {
@@ -172,7 +175,7 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
         <h2>Commit to Rekordbox</h2>
         <p>
           {summary.keepCount} keep, {summary.cutCount} cut, {summary.ratingCount} ratings,{' '}
-          {summary.colorCount} colors.
+          {summary.colorCount} colors, {summary.tagCount} tag edits.
         </p>
         {keepBlocked ? (
           <p className="top-bar__meta">
@@ -245,5 +248,6 @@ function summarize(decisions: Record<string, TrackDecision>) {
     cutCount: values.filter((d) => !d.keep).length,
     ratingCount: values.filter((d) => d.rating != null).length,
     colorCount: values.filter((d) => d.colorId != null).length,
+    tagCount: values.filter((d) => d.myTagIds != null).length,
   }
 }

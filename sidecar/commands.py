@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import psutil
 
@@ -54,6 +56,16 @@ def close_db() -> None:
     global _db
     if _db is not None:
         _db.close()
+        # pyrekordbox's close() only closes the session; the SQLAlchemy engine
+        # keeps a pooled connection that memory-maps the WAL "-shm" file. On
+        # Windows that mapping blocks overwriting master.db-shm during restore
+        # (OSError 22). Dispose the engine to release the file handles.
+        engine = getattr(_db, "engine", None)
+        if engine is not None:
+            try:
+                engine.dispose()
+            except Exception:
+                pass
         _db = None
 
 
@@ -294,15 +306,121 @@ def get_cues(track_id: str) -> list[dict[str, Any]]:
     return result
 
 
-def get_my_tags(track_id: str) -> list[str]:
+def _my_tag_name_map(db: Rekordbox6Database) -> dict[str, str]:
+    """Map of MyTag ID -> tag name for all tags (categories included)."""
+    return {
+        str(tag.ID): str(getattr(tag, "Name", None) or "")
+        for tag in db.get_my_tag() or []
+    }
+
+
+def get_my_tag_tree() -> list[dict[str, Any]]:
+    """My Tag categories (Attribute=1) with their child tags (Attribute=0).
+
+    Mirrors the Rekordbox "My Tag" panel layout: an ordered list of categories,
+    each holding its ordered tags.
+    """
     db = open_db()
-    names: list[str] = []
-    for tag in db.get_my_tag() or []:
-        songs = db.get_my_tag_songs(MyTagID=tag.ID) or []
-        if any(str(song.ContentID) == str(track_id) for song in songs):
-            if getattr(tag, "Name", None):
-                names.append(str(tag.Name))
-    return names
+    all_tags = list(db.get_my_tag() or [])
+    categories: dict[str, dict[str, Any]] = {}
+    for tag in all_tags:
+        if int(getattr(tag, "Attribute", 0) or 0) == 1:
+            categories[str(tag.ID)] = {
+                "id": str(tag.ID),
+                "name": str(getattr(tag, "Name", None) or ""),
+                "seq": int(getattr(tag, "Seq", 0) or 0),
+                "tags": [],
+            }
+    for tag in all_tags:
+        if int(getattr(tag, "Attribute", 0) or 0) == 0:
+            parent = str(tag.ParentID)
+            category = categories.get(parent)
+            if category is not None:
+                category["tags"].append(
+                    {
+                        "id": str(tag.ID),
+                        "name": str(getattr(tag, "Name", None) or ""),
+                        "seq": int(getattr(tag, "Seq", 0) or 0),
+                    }
+                )
+    ordered = sorted(categories.values(), key=lambda c: c["seq"])
+    for category in ordered:
+        category["tags"].sort(key=lambda t: t["seq"])
+    return ordered
+
+
+def _valid_tag_ids(db: Rekordbox6Database) -> set[str]:
+    """IDs that are assignable tags (Attribute=0), excluding categories."""
+    return {
+        str(tag.ID)
+        for tag in db.get_my_tag() or []
+        if int(getattr(tag, "Attribute", 0) or 0) == 0
+    }
+
+
+def get_my_tags(track_id: str) -> list[dict[str, str]]:
+    """My Tags assigned to a track as ``[{"id", "name"}]``."""
+    db = open_db()
+    from pyrekordbox.db6 import tables
+
+    names = _my_tag_name_map(db)
+    rows = (
+        db.query(tables.DjmdSongMyTag)
+        .filter_by(ContentID=str(track_id))
+        .all()
+    )
+    result: list[dict[str, str]] = []
+    for row in rows:
+        tag_id = str(row.MyTagID)
+        result.append({"id": tag_id, "name": names.get(tag_id, tag_id)})
+    return result
+
+
+def set_my_tags(track_id: str, tag_ids: list[str]) -> dict[str, Any]:
+    """Assign the given My Tag IDs to a track, removing any not listed.
+
+    Writes ``DjmdSongMyTag`` rows directly (pyrekordbox has no My Tag write
+    API) using the same UUID/USN pattern it uses for playlist songs.
+    """
+    if is_rekordbox_running():
+        raise RuntimeError("Close Rekordbox before writing to the library.")
+    db = open_db()
+    from pyrekordbox.db6 import tables
+
+    _require_content(db, track_id)
+    valid = _valid_tag_ids(db)
+    desired = {str(t) for t in tag_ids}
+    unknown = desired - valid
+    if unknown:
+        raise ValueError(f"Unknown My Tag id(s): {', '.join(sorted(unknown))}")
+
+    existing = (
+        db.query(tables.DjmdSongMyTag)
+        .filter_by(ContentID=str(track_id))
+        .all()
+    )
+    existing_by_tag = {str(row.MyTagID): row for row in existing}
+    current = set(existing_by_tag.keys())
+
+    now = datetime.now()
+    for tag_id in current - desired:
+        db.delete(existing_by_tag[tag_id])
+    for tag_id in desired - current:
+        track_no = (
+            db.query(tables.DjmdSongMyTag).filter_by(MyTagID=str(tag_id)).count() + 1
+        )
+        row = tables.DjmdSongMyTag.create(
+            ID=str(uuid4()),
+            MyTagID=str(tag_id),
+            ContentID=str(track_id),
+            TrackNo=track_no,
+            UUID=str(uuid4()),
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+    db.commit()
+    return {"ok": True, "tagIds": sorted(desired)}
 
 
 def get_beatgrid(track_id: str) -> list[dict[str, Any]]:
@@ -331,6 +449,14 @@ def plan_commit(
         if item.get("colorId") is not None:
             operations.append(
                 {"type": "set_color", "trackId": track_id, "colorId": int(item["colorId"])}
+            )
+        if item.get("myTagIds") is not None:
+            operations.append(
+                {
+                    "type": "set_my_tags",
+                    "trackId": track_id,
+                    "tagIds": [str(t) for t in item["myTagIds"]],
+                }
             )
         if item.get("keep"):
             dest = item.get("destPlaylistId") or default_dest_id
@@ -436,7 +562,9 @@ def analyze_track_cues(track_path: str) -> list[float]:
                 filtered_times.append(t)
         return filtered_times
     except Exception as e:
-        print(f"Error analyzing track cues: {e}")
+        # Never print to stdout: it is the JSON-RPC channel and stray output
+        # corrupts responses. Log to stderr instead.
+        print(f"Error analyzing track cues: {e}", file=sys.stderr)
         return []
 
 
@@ -454,6 +582,8 @@ def dispatch(method: str, params: dict[str, Any] | None = None) -> Any:
         "get_playlist_membership": lambda p: get_playlist_membership(p["playlistIds"]),
         "get_cues": lambda p: get_cues(p["trackId"]),
         "get_my_tags": lambda p: get_my_tags(p["trackId"]),
+        "get_my_tag_tree": lambda _: get_my_tag_tree(),
+        "set_my_tags": lambda p: set_my_tags(p["trackId"], p.get("tagIds", [])),
         "get_beatgrid": lambda p: get_beatgrid(p["trackId"]),
         "find_duplicates": lambda p: find_duplicates(p["playlistId"]),
         "plan_commit": lambda p: plan_commit(

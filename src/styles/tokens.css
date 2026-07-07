@@ -1,25 +1,41 @@
 :root {
-  --bg: #0a0c0e;
-  --bg-2: #0f1316;
-  --panel: #14191d;
-  --panel-2: #191f24;
-  --line: #232b31;
-  --line-2: #2e383f;
-  --txt: #eef3f5;
-  --txt-2: #9aa7af;
-  --txt-3: #5e6b73;
-  --keep: #5eead4;
-  --keep-deep: #10b981;
-  --cut: #fb7185;
-  --cut-deep: #e11d48;
-  --amber: #fbbf24;
-  --radius: 10px;
-  --radius-lg: 16px;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  /* Graphite surfaces — flat, neutral-cool, no tint glow */
+  --bg: #0e1114;
+  --bg-2: #12161a;
+  --panel: #12161a;
+  --panel-2: #1b2026;
+  --line: #262d34;
+  --line-2: #333c44;
+  --txt: #e8edf0;
+  --txt-2: #8b98a1;
+  --txt-3: #5a666e;
+
+  /* Primary interactive accent = Rekordbox blue */
+  --accent: #3b9eef;
+  --accent-deep: #2b6fa8;
+  --accent-tint: #14212e;
+
+  /* Semantic decision colors (stronger, less pastel) */
+  --keep: #22c55e;
+  --keep-deep: #16a34a;
+  --keep-tint: #123021;
+  --cut: #e0483d;
+  --cut-deep: #b91c1c;
+  --cut-tint: #2f1414;
+
+  /* Data color — key badge / rating */
+  --amber: #f0a52a;
+
+  /* Tight radii, flat elevation */
+  --radius: 6px;
+  --radius-lg: 8px;
+  --shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+
   --font-display: 'Archivo', sans-serif;
   --font-ui: 'Archivo', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
+  /* Semantic aliases */
   --surface: var(--panel);
   --elevated: var(--panel-2);
   --border: var(--line);

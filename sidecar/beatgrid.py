@@ -10,20 +10,26 @@ def beatgrid_from_content(db: Any, content: Any) -> list[dict[str, float | int |
         return []
 
     beats: list[dict[str, float | int | None]] = []
-    for anlz in anlz_files:
+    for anlz in anlz_files.values():
         grid = anlz.get_tag("beat_grid")
         if grid is None:
             continue
-        entries = getattr(grid, "beats", None) or getattr(grid, "beat_entries", None) or []
-        for entry in entries:
-            time_ms = float(getattr(entry, "time", 0) or 0)
-            tempo = getattr(entry, "tempo", None)
-            bpm = float(tempo) / 100.0 if tempo else None
+        # pyrekordbox exposes the beat grid as numpy arrays via ``get()``:
+        # beat numbers (1-4), bpms (already real BPM) and times (seconds).
+        # Note: ``grid.beats``/``grid.times`` are numpy arrays, so they must
+        # never be used in boolean context (``x or y`` raises "truth value of
+        # an array is ambiguous").
+        try:
+            beat_numbers, bpms, times = grid.get()
+        except Exception:
+            continue
+        for beat_number, bpm, time_sec in zip(beat_numbers, bpms, times):
+            bpm_value = float(bpm)
             beats.append(
                 {
-                    "positionSec": time_ms / 1000.0,
-                    "bpm": bpm,
-                    "beatInBar": int(getattr(entry, "beat_number", 0) or 0),
+                    "positionSec": float(time_sec),
+                    "bpm": bpm_value if bpm_value > 0 else None,
+                    "beatInBar": int(beat_number),
                 }
             )
         if beats:

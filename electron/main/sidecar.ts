@@ -32,6 +32,12 @@ function sidecarBinaryName(): string {
   return process.platform === 'win32' ? 'rb-bridge.exe' : 'rb-bridge'
 }
 
+function venvPythonPath(venvDir: string): string {
+  return process.platform === 'win32'
+    ? path.join(venvDir, 'Scripts', 'python.exe')
+    : path.join(venvDir, 'bin', 'python3')
+}
+
 function sidecarPaths(): { executable: string; args: string[]; cwd: string } {
   if (app.isPackaged) {
     const resources = process.resourcesPath
@@ -42,13 +48,13 @@ function sidecarPaths(): { executable: string; args: string[]; cwd: string } {
       return { executable: bundled, args: [], cwd: path.dirname(bundled) }
     }
 
-    const python = path.join(resources, 'sidecar-venv', 'bin', 'python3')
+    const python = venvPythonPath(path.join(resources, 'sidecar-venv'))
     return { executable: python, args: [script], cwd: path.dirname(script) }
   }
 
   const appRoot = process.env.APP_ROOT ?? ''
   const script = path.join(appRoot, 'sidecar', 'rb_bridge.py')
-  const python = path.join(appRoot, '.venv', 'bin', 'python3')
+  const python = venvPythonPath(path.join(appRoot, '.venv'))
   return { executable: python, args: [script], cwd: path.dirname(script) }
 }
 

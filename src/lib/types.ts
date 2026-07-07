@@ -65,6 +65,25 @@ export type TrackDecision = {
   colorId?: number
   destPlaylistId?: string
   cutPlaylistId?: string
+  myTagIds?: string[]
+}
+
+export type AssignedTag = {
+  id: string
+  name: string
+}
+
+export type MyTag = {
+  id: string
+  name: string
+  seq: number
+}
+
+export type MyTagCategory = {
+  id: string
+  name: string
+  seq: number
+  tags: MyTag[]
 }
 
 export type CommitSummary = {

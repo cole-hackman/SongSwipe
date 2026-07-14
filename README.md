@@ -99,7 +99,35 @@ Dark theme with a curated token palette (`--bg`, `--panel`, `--line`, `--txt`, e
 
 > **You need Rekordbox 7 installed with your library on this computer.** SongSwipe reads and writes your real Rekordbox database — it can't run without it.
 
-SongSwipe currently runs from source, which needs two free tools installed once: **Node.js** and **Python**. After that, a single setup step installs everything else. Follow the guide for your operating system below.
+There are two ways to get SongSwipe running:
+
+- **Option A — Install the packaged app** (easiest; nothing else to install). Best for most people.
+- **Option B — Run from source** (needs Node.js + Python installed once). Best if you want to modify the code or there is no installer for your OS yet.
+
+---
+
+### Option A — Install the packaged app (Windows)
+
+The packaged installer bundles everything (no Node, no Python, no setup). You just need the installer file.
+
+**1. Get the installer**
+- Download **`SongSwipe_0.1.0.exe`** (from whoever shared it with you, or from the project's Releases page).
+
+**2. Run it**
+- Double-click **`SongSwipe_0.1.0.exe`**.
+- Windows may show a blue **“Windows protected your PC”** box (the app isn’t code-signed yet). Click **More info → Run anyway** — this is expected.
+- Follow the installer, then launch **SongSwipe** from the Start menu or desktop shortcut.
+
+**3. Use it**
+- Make sure **Rekordbox 7 is installed** with your library. **Close Rekordbox before committing changes** (SongSwipe blocks writes while Rekordbox is open and backs up your database first).
+
+That’s it — no terminal, no dependencies. A macOS build (`.dmg`) can be produced the same way (see [Building a standalone app](#building-a-standalone-app-for-distribution)).
+
+---
+
+### Option B — Run from source
+
+Needs two free tools installed once: **Node.js** and **Python**. After that, a single setup step installs everything else. Follow the guide for your operating system below.
 
 <details open>
 <summary><b>🪟 Windows — step by step</b></summary>

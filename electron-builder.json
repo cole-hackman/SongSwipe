@@ -14,11 +14,6 @@
     {
       "from": "sidecar/dist/rb-bridge",
       "to": "rb-bridge"
-    },
-    {
-      "from": "sidecar",
-      "to": "sidecar",
-      "filter": ["rb_bridge.py", "commands.py", "requirements.txt"]
     }
   ],
   "mac": {
@@ -28,11 +23,6 @@
       {
         "from": "sidecar/dist/rb-bridge",
         "to": "rb-bridge"
-      },
-      {
-        "from": "sidecar",
-        "to": "sidecar",
-        "filter": ["rb_bridge.py", "commands.py", "requirements.txt"]
       }
     ]
   },
@@ -48,11 +38,6 @@
       {
         "from": "sidecar/dist/rb-bridge.exe",
         "to": "rb-bridge.exe"
-      },
-      {
-        "from": "sidecar",
-        "to": "sidecar",
-        "filter": ["rb_bridge.py", "commands.py", "requirements.txt"]
       }
     ]
   },

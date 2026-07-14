@@ -7,12 +7,13 @@
   "type": "module",
   "main": "dist-electron/main/index.js",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "vite",
-    "build:sidecar": "cd sidecar && ../.venv/bin/pip install pyinstaller -q && ../.venv/bin/pyinstaller build.spec --noconfirm --clean",
+    "build:sidecar": "node scripts/build-sidecar.mjs",
     "build": "npm run build:sidecar && vite build && electron-builder",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:sidecar": ".venv/bin/pytest sidecar/tests -q",
+    "test:sidecar": "node scripts/venv.mjs -m pytest sidecar/tests -q",
     "test:all": "npm run test && npm run test:sidecar",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },

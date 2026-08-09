@@ -1,274 +1,124 @@
 # SongSwipe
 
-Tinder-style Rekordbox track culling for DJs. Swipe through a playlist, preview tracks and hot cues, rate and color-tag, then commit keep/cull decisions back to your Rekordbox library.
+Tinder-style track culling for Rekordbox DJs — swipe through a playlist,
+preview the parts that matter, tag as you go, then commit keep/cull decisions
+back to your real library.
 
-SongSwipe reads your local Rekordbox 7 `master.db`, lets you work through tracks quickly with waveforms and keyboard shortcuts, and writes back ratings, colors, My Tags, and playlist membership when you are ready — without deleting files from disk.
+SongSwipe was built with a co-developer, not solo.
+<!-- TODO: verify — name/handle and the what-I-built vs what-we-built split.
+The commit history only contains Cole's commits, so this needs Cole's own
+words. See README-QUESTIONS.md. -->
+
+<!-- SCREENSHOT: the triage view — card stack with waveform, hot-cue markers,
+and the decision rail. A short GIF of swipe → next card loading (with audio
+prefetch making it instant) is the core loop. Keep under 5MB. -->
+
+## The problem
+
+DJ libraries grow faster than they get pruned. Deciding whether to keep a
+track means listening to the right parts of it — the intro, the drop — and
+Rekordbox makes that a slog: click a track, scrub around, open a menu to
+rate or tag it, repeat a thousand times. Most DJs just stop pruning.
+SongSwipe turns the decision into a swipe loop: hot-cue-aware preview
+presets (Intro / 32 bars / Drop / Outro), one-gesture keep/cull, ratings and
+tags inline, and a batch write-back at the end. "Cull" means added to a cull
+playlist — nothing is ever deleted from disk.
 
 ## How it works
 
-1. **Pick a source playlist** — normal or smart playlists from your Rekordbox library.
-2. **Triage tracks** — swipe or use keyboard shortcuts to keep or cull. Preview audio, jump to hot cues, and skim with Intro / 32 bars / Drop / Outro presets.
-3. **Review decisions** — edit ratings, colors, and per-track destination playlists before committing.
-4. **Commit to Rekordbox** — write changes directly to `master.db` (with automatic backup), or export Rekordbox XML for manual import.
-
-Cull means “add to cull playlist,” not “delete from disk.” Hot cues and beatgrids are read-only overlays.
-
-## Features
-
-### Core workflow
-
-- **Tinder-style swipe deck** with keep/cut gestures and undo
-- **Waveform player** with hot-cue regions, optional beatgrid downbeat overlay, cached peaks, and de-duplicated cue+preset markers
-- **Transport bar** with play/pause, seek, hot-cue buttons, and skip presets
-- **Rating, color, and My Tags tagging** during triage, written back on commit (My Tags shown grouped by category, just like Rekordbox)
-- **Destination playlists** — global keep/cut targets plus per-track keep overrides
-- **Session persistence** — auto-saves progress; named sessions with save/load/delete
-- **Card stack triage layout** — interactive front card with decorative depth layers, three-zone top bar, collapsible playlist drawer, right decision rail, and drawer-based session/settings panels
-- **Keyboard hint** — persistent footer pill showing current key bindings (Triage mode)
-
-### Session modes
-
-| Mode | Purpose |
-|------|---------|
-| **Triage** | Swipe workflow with waveform, transport, and track controls |
-| **Audit** | Scrollable, configurable-column list of all tracks with decision status, inline playback, and sortable metadata (comment, play count, dates, file type) |
-| **Compare** | A/B two tracks side by side for close listening |
-
-### Smart assistance
-
-- **Batch rules** — suggest keep/cull based on BPM, rating, or key (configurable in settings)
-- **Playlist badges** — shows if a track is already in your keep or cull playlists
-- **Duplicate detection** — clusters tracks by file path or artist+title
-- **Track extras** — comment, play count, dates, and My Tags (view and assign, grouped by category)
-- **Stats dashboard** — keep ratio, average BPM, color distribution
-
-### Commit and safety
-
-- **Review queue** — edit or remove decisions before writing
-- **Dry-run preview** — see planned DB operations without changing anything
-- **XML export** — alternative commit path via Rekordbox XML import
-- **Automatic backup** — timestamped copy of `master.db` (including WAL/SHM when present) before every commit
-- **Rollback** — restore from recent backups in the commit dialog
-- **Rekordbox status indicator** — live warning when Rekordbox is open (writes are blocked while RB is running)
-
-SongSwipe never writes to `master.db` while Rekordbox is running.
-
-### Input
-
-- **Keyboard shortcuts** — fully rebindable in settings (press `?` for help)
-- **Gamepad** — A=cull, B=keep, X=play (Xbox layout)
-- **MIDI** — C2=cull, D2=keep, E2=play
-
-### Performance
-
-- Bulk track+cue fetch from the Rekordbox sidecar
-- Batch file-existence checks and missing-file warnings
-- Artwork URL cache and waveform peak cache
-- Configurable waveform quality (bar width, normalize, fast mode)
-- Audio prefetch window (default 5 ahead / 2 behind)
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Electron app (React 19 + TypeScript + Zustand)         │
-│  ┌─────────────┐  songswipe-media://  ┌──────────────┐  │
-│  │  Renderer   │ ◄──────────────────► │  Main process │  │
-│  │  (UI/audio) │       IPC            │  (fs, cache)  │  │
-│  └──────┬──────┘                      └──────┬───────┘  │
-│         │ JSON-RPC (stdio)                    │          │
-│         ▼                                       ▼          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  Python sidecar (rb-bridge / pyrekordbox 0.4.4)  │   │
-│  │  Reads/writes Rekordbox 7 master.db              │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
-
-- **Renderer** — triage swipe UI with drawer-based panels, card stack, wavesurfer.js waveforms with cue/beatgrid markers, audio pool with prefetch
-- **Main process** — custom `songswipe-media://` protocol, waveform peak cache, named sessions, export dialogs
-- **Sidecar** — `rb_bridge.py` exposes Rekordbox operations over line-delimited JSON-RPC
-
-Write scope is intentionally limited: **rating, color, My Tags, and playlist membership only**. No hot-cue writes, no file deletion.
-
-### Design
-
-Dark theme with a curated token palette (`--bg`, `--panel`, `--line`, `--txt`, etc.) defined in `src/styles/tokens.css`. The UI uses **Archivo** (display/UI) and **IBM Plex Mono** (monospace) fonts, bundled via `@fontsource` packages — no external network requests for type.
-
-## Install & set up
-
-> **You need Rekordbox 7 installed with your library on this computer.** SongSwipe reads and writes your real Rekordbox database — it can't run without it.
-
-There are two ways to get SongSwipe running:
-
-- **Option A — Install the packaged app** (easiest; nothing else to install). Best for most people.
-- **Option B — Run from source** (needs Node.js + Python installed once). Best if you want to modify the code or there is no installer for your OS yet.
-
----
-
-### Option A — Install the packaged app (Windows)
-
-The packaged installer bundles everything (no Node, no Python, no setup). You just need the installer file.
-
-**1. Get the installer**
-- Download **`SongSwipe_0.1.0.exe`** (from whoever shared it with you, or from the project's Releases page).
-
-**2. Run it**
-- Double-click **`SongSwipe_0.1.0.exe`**.
-- Windows may show a blue **“Windows protected your PC”** box (the app isn’t code-signed yet). Click **More info → Run anyway** — this is expected.
-- Follow the installer, then launch **SongSwipe** from the Start menu or desktop shortcut.
-
-**3. Use it**
-- Make sure **Rekordbox 7 is installed** with your library. **Close Rekordbox before committing changes** (SongSwipe blocks writes while Rekordbox is open and backs up your database first).
-
-That’s it — no terminal, no dependencies. A macOS build (`.dmg`) can be produced the same way (see [Building a standalone app](#building-a-standalone-app-for-distribution)).
-
----
-
-### Option B — Run from source
-
-Needs two free tools installed once: **Node.js** and **Python**. After that, a single setup step installs everything else. Follow the guide for your operating system below.
-
-<details open>
-<summary><b>🪟 Windows — step by step</b></summary>
-
-**1. Install Node.js**
-- Go to <https://nodejs.org> and click the big green **LTS** button to download.
-- Open the downloaded file and click **Next** through the installer (the defaults are fine).
-
-**2. Install Python**
-- Go to <https://www.python.org/downloads/> and click **Download Python**.
-- Open the downloaded file. **On the very first screen, tick the box that says “Add python.exe to PATH.”** (This is important.) Then click **Install Now**.
-
-**3. Download SongSwipe**
-- On the SongSwipe GitHub page, click the green **Code** button → **Download ZIP**.
-- Find the ZIP in your Downloads, **right-click it → Extract All**. You’ll get a `SongSwipe` folder.
-
-**4. Install SongSwipe**
-- Open the `SongSwipe` folder and **double-click `setup-windows.bat`**.
-- A black window opens and installs everything. This takes a few minutes — wait until it says **“Done!”**
-- If Windows shows a blue “Windows protected your PC” box, click **More info → Run anyway**.
-
-**5. Start SongSwipe**
-- **Double-click `start-windows.bat`.** The app opens. Keep the black window open while you use it; close it to quit.
-
-Next time you just double-click `start-windows.bat` — setup is only needed once.
-</details>
-
-<details>
-<summary><b>🍎 Mac — step by step</b></summary>
-
-**1. Install Node.js**
-- Go to <https://nodejs.org> and click the big green **LTS** button to download.
-- Open the downloaded file and click through the installer (the defaults are fine).
-
-**2. Install Python**
-- Go to <https://www.python.org/downloads/> and click **Download Python**.
-- Open the downloaded file and click through the installer.
-
-**3. Download SongSwipe**
-- On the SongSwipe GitHub page, click the green **Code** button → **Download ZIP**.
-- Double-click the ZIP in your Downloads to unzip it. You’ll get a `SongSwipe` folder.
-
-**4. Install SongSwipe**
-- Open the `SongSwipe` folder. **Right-click `setup-mac.command` → Open**, then click **Open** in the security prompt (right-click is needed only the first time).
-- A Terminal window installs everything. This takes a few minutes — wait until it says **“Done!”**
-
-**5. Start SongSwipe**
-- **Right-click `start-mac.command` → Open** (again, only the first time needs right-click). The app opens. Keep the Terminal window open while you use it; close it to quit.
-</details>
-
-<details>
-<summary><b>⌨️ Prefer the command line? (any OS)</b></summary>
-
-Requires **Node.js 20+** and **Python 3.11+** already installed.
-
-```bash
-npm run setup   # creates the Python venv + installs all dependencies
-npm run dev     # starts the app
-```
-
-`npm run setup` is the same on Windows, macOS, and Linux — it picks the right Python paths for your OS automatically.
-</details>
-
-### Finding your Rekordbox library
-
-[pyrekordbox](https://github.com/dylanljones/pyrekordbox) 0.4.4 unlocks `master.db` automatically — no separate key step required. SongSwipe auto-detects the database in the usual Rekordbox location. If it can’t find it, set the path in-app under **Library settings**, or set the `SONGSWIPE_DB_PATH` environment variable to your `master.db`.
-
-> **Close Rekordbox before committing changes.** SongSwipe never writes to `master.db` while Rekordbox is running, and it makes a timestamped backup before every commit.
-
-Star ratings use Rekordbox’s encoded scale (0, 51, 102, 153, 204, 255 for 0–5 stars) when reading and writing `master.db`.
-
-## Building a standalone app (for distribution)
-
-The steps above run SongSwipe from source. To produce a **double-click installer that end users can run with no Node, Python, or setup at all**, build it on the target OS:
-
-```bash
-npm run build
-```
-
-This bundles the Python sidecar into a standalone `rb-bridge` binary with PyInstaller and packages the app with electron-builder. Output goes to `release/<version>/` (a `.exe` installer on Windows, a `.dmg` on macOS). Because the sidecar binary is platform-specific, run `npm run build` **on each OS** you want to ship.
-
-## Tests
-
-```bash
-npm run test:all      # Vitest (frontend) + pytest (sidecar)
-npm run test          # Frontend only
-npm run test:sidecar  # Sidecar only
-npm run typecheck     # TypeScript
-```
-
-Integration tests against a real DB copy:
-
-```bash
-SONGSWIPE_TEST_DB=/path/to/master.db.copy npm run test:sidecar
-```
-
-## Keyboard shortcuts
-
-Default bindings — customize in **Keyboard map** settings. Press `?` in-app for help. Triage mode also shows a persistent footer hint with your current bindings.
-
-| Key | Action |
-|-----|--------|
-| `←` / `→` | Cut / Keep (Triage mode) |
-| `Space` | Play / Pause |
-| `1`–`8` | Jump to hot cue |
-| `Shift+1`–`Shift+5` | Set rating |
-| `Z` | Undo last decision |
-| `?` | Help overlay |
-
-## Project structure
-
-```
-├── electron/              Main process, preload, IPC, caches
-│   └── main/
-├── src/                   React renderer
-│   ├── audio/             Audio pool, waveform, gamepad/MIDI
-│   ├── components/        UI components
-│   │   ├── triage/        Triage-mode layout (top bar, card stack, drawers, rails)
-│   │   └── ...            Shared components (swipe deck, commit dialog, etc.)
-│   ├── lib/               Types, keymap, batch rules, cue presets, waveform markers,
-│   │                      audit columns, IPC helpers
-│   ├── store/             Zustand stores (queue, decisions, settings)
-│   └── styles/            CSS tokens, global styles, triage layout
-├── sidecar/               Python Rekordbox bridge
-│   ├── rb_bridge.py       JSON-RPC stdio server
-│   ├── commands.py        Rekordbox read/write commands
-│   └── tests/
-├── test/                  Vitest unit tests
-│   ├── components/
-│   ├── electron/
-│   └── lib/
-└── docs/superpowers/plans/   Feature implementation plans
-```
-
-## Environment variables
-
-| Variable | Purpose |
-|----------|---------|
-| `SONGSWIPE_DB_PATH` | Override path to Rekordbox `master.db` |
-| `SONGSWIPE_TEST_DB` | Path to a DB copy for sidecar integration tests |
-
-## License
-
-MIT
+- An Electron + React desktop app for the UI and audio: wavesurfer.js
+  waveforms with cue and beatgrid markers, a local media protocol for
+  playback, and an audio prefetch window so the next card plays instantly.
+- A Python sidecar is the only thing that touches Rekordbox. It speaks
+  line-delimited JSON-RPC over stdio and uses pyrekordbox with SQLCipher to
+  open Rekordbox 7's encrypted `master.db`. librosa powers smart cue
+  placement (onset detection plus MFCC clustering for section boundaries).
+- The Electron main process enforces a method allowlist between the renderer
+  and the sidecar — the UI can only invoke a fixed set of commands.
+- Decisions accumulate in an auto-saved session. Commit writes ratings,
+  colors, My Tags, and playlist membership in one batch — after a
+  timestamped backup of `master.db` (including WAL/SHM), with a dry-run
+  preview first and rollback from the commit dialog. Rekordbox XML export
+  exists as the no-write alternative.
+- Writes are refused while Rekordbox is running (live process check), and
+  write scope is deliberately narrow: rating, color, My Tags, playlist
+  membership. Hot cues and beatgrids are read-only overlays.
+
+## Running it
+
+Requires Rekordbox 7 with your library on the same machine — SongSwipe
+reads and writes your real database and can't run without it. There is a
+packaged Windows installer (unsigned; SmartScreen will warn), or from
+source with Node and Python installed:
+
+    git clone https://github.com/cole-hackman/SongSwipe
+    cd SongSwipe
+    npm run setup   # installs JS deps and provisions the Python sidecar
+    npm run dev
+
+`setup-mac.command` / `setup-windows.bat` do the same by double-click.
+Tests: `npm run test:all` runs the vitest suite and the sidecar pytest
+suite.
+
+## Scope and non-goals
+
+**In scope:** triaging one playlist at a time — swipe, audit-list, and A/B
+compare modes; ratings, colors, My Tags; duplicate detection; batch
+keep/cull rules; commit to Rekordbox or XML.
+
+**Not in scope:**
+
+- Deleting audio files. Culling adds to a playlist; disk is never touched.
+- Writing hot cues or beatgrids. Read-only overlays, by design.
+- Other DJ software (Serato, Traktor) or streaming libraries. Rekordbox 7's
+  local database only.
+
+## Tradeoffs
+
+**Writing directly to `master.db` instead of XML-only.** Rekordbox's
+database is encrypted and undocumented; the supported integration path is
+XML import. Direct writes bought a one-click commit — decisions land in the
+library you'll open tomorrow, no import step. The cost is coupling to a
+reverse-engineered schema and key via a pinned pyrekordbox version, which a
+Rekordbox update can break at any time. The mitigations are layered:
+automatic timestamped backups, dry-run preview, rollback, a refusal to write
+while Rekordbox runs, and the XML path kept as the escape hatch.
+
+**A Python sidecar over stdio instead of a pure-Node app.** The Python
+ecosystem is the whole reason: pyrekordbox for the database, librosa for
+audio analysis — neither has a Node equivalent worth trusting. The cost is
+process management, an IPC boundary, and shipping a PyInstaller-bundled
+Python runtime per platform, which is the most fragile part of the build.
+The allowlist in the Electron main process keeps that boundary narrow.
+
+## Known limitations and failure modes
+
+- The entire write path depends on Rekordbox's reverse-engineered schema and
+  encryption key. A Rekordbox update can break reads and writes overnight;
+  recovery is the backups and the XML export path.
+- Smart cue placement is heuristic. Onset plus MFCC section clustering works
+  on conventionally structured dance music and misplaces cues on tracks
+  without clear percussive sections.
+- CI lints Markdown; nothing runs the tests on push. The sidecar pytest
+  suite (15 files) and the vitest suite run locally via `npm run test:all`,
+  plus a manual checklist in `docs/manual-test.md`.
+- Installers are unsigned — Windows SmartScreen and macOS Gatekeeper both
+  warn. Expected, but it costs trust at exactly the moment the app asks to
+  touch someone's library.
+- Packaging librosa/soundfile with PyInstaller is per-platform fragile; the
+  Build workflow produces artifacts but nothing smoke-tests them.
+
+## What I'd do next
+
+1. Make CI run `test:all` — the suites exist and pass locally; nothing
+   executes them on push.
+2. Code-sign the installers. The SmartScreen warning is the worst possible
+   first impression for an app that writes to your DJ library.
+3. A ground-truth fixture set for smart cues — real tracks with
+   hand-labeled sections — so cue-placement changes can be evaluated
+   instead of eyeballed.
+
+## Stack
+
+Electron · React 19 · TypeScript · Vite · Zustand · wavesurfer.js · Python
+sidecar (pyrekordbox, librosa, SQLCipher) · PyInstaller · electron-builder

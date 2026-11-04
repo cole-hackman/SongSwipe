@@ -41,7 +41,7 @@
     "jsdom": "^29.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "^8.0.16",
     "vite-plugin-electron": "^1.0.1",
     "vite-plugin-electron-renderer": "^1.0.0",

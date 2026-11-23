@@ -53,14 +53,7 @@ Verify the media server can read your file (Terminal):
 ```bash
 # After app is running, check Electron terminal for: [media-server] listening on 127.0.0.1:XXXX
 # Or run this standalone test:
-npx tsx -e "
-import { ensureMediaServer, toHttpMediaUrl, stopMediaServer } from './electron/main/media-server.ts';
-await ensureMediaServer();
-const url = toHttpMediaUrl('/Volumes/HACKMAN SSD/Tracks/your-track.mp3');
-const res = await fetch(url, { headers: { Range: 'bytes=0-3' } });
-console.log(res.status, await res.arrayBuffer());
-stopMediaServer();
-"
+npx tsx scripts/test-media-server.mts /path/to/your-track.mp3
 ```
 
 Expect status `206` and MP3 bytes (often starts with `ID3` or `0xff`).

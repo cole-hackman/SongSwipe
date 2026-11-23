@@ -1,5 +1,7 @@
 import { ipcMain } from 'electron'
 import { readAppSettings, writeAppSettings } from './app-settings'
+import { trackPathsFromResult } from './media-access'
+import { allowMediaPaths, clearMediaPaths } from './media-server'
 import { ALLOWED_SIDECAR_METHODS } from './sidecar-allowlist'
 import {
   callSidecar,
@@ -40,7 +42,9 @@ export function registerIpcHandlers(): void {
     if (sidecarStatus.state === 'error') {
       throw new Error(sidecarStatus.error ?? 'Sidecar is not available')
     }
-    return callSidecar(method, params)
+    const result = await callSidecar(method, params)
+    allowMediaPaths(trackPathsFromResult(method, result))
+    return result
   })
 
   ipcMain.handle('sidecar:status', () => ({
@@ -60,6 +64,7 @@ export function registerIpcHandlers(): void {
     if ('dbPathOverride' in settings) {
       const dbPath = (settings.dbPathOverride as string | null) ?? null
       setSidecarDbPath(dbPath)
+      clearMediaPaths()
       restartSidecar()
       await ensureSidecarReady()
     }

@@ -13,6 +13,10 @@ const CONTENT_TYPES: Record<string, string> = {
   '.opus': 'audio/ogg',
 }
 
+export function isAudioPath(filePath: string): boolean {
+  return path.extname(filePath).toLowerCase() in CONTENT_TYPES
+}
+
 export function contentTypeForPath(filePath: string): string {
   return CONTENT_TYPES[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream'
 }

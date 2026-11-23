@@ -23,7 +23,7 @@
     "@fontsource/hanken-grotesk": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/jetbrains-mono": "^5.2.8",
-    "@react-spring/web": "^9.7.5",
+    "@react-spring/web": "^10.1.2",
     "@wavesurfer/react": "^1.0.12",
     "react-tinder-card": "^1.6.4",
     "wavesurfer.js": "^7.12.8",

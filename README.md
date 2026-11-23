@@ -4,15 +4,6 @@ Tinder-style track culling for Rekordbox DJs — swipe through a playlist,
 preview the parts that matter, tag as you go, then commit keep/cull decisions
 back to your real library.
 
-SongSwipe was built with a co-developer, not solo.
-<!-- TODO: verify — name/handle and the what-I-built vs what-we-built split.
-The commit history only contains Cole's commits, so this needs Cole's own
-words. See README-QUESTIONS.md. -->
-
-<!-- SCREENSHOT: the triage view — card stack with waveform, hot-cue markers,
-and the decision rail. A short GIF of swipe → next card loading (with audio
-prefetch making it instant) is the core loop. Keep under 5MB. -->
-
 ## The problem
 
 DJ libraries grow faster than they get pruned. Deciding whether to keep a

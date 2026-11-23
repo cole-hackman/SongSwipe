@@ -15,6 +15,7 @@ import library_files
 from beatgrid import beatgrid_from_content
 from duplicates import cluster_duplicates
 from rating import rating_from_db, rating_to_db
+from real_library import check_library_path, default_library_paths
 from xml_export import build_commit_xml
 
 try:
@@ -28,16 +29,10 @@ _db: Rekordbox6Database | None = None
 def _db_path() -> Path:
     override = os.environ.get("SONGSWIPE_DB_PATH")
     if override:
-        return Path(override)
-    home = Path.home()
-    candidates = [
-        home / "Library/Pioneer/rekordbox/master.db",
-        home / "AppData/Roaming/Pioneer/rekordbox/master.db",
-        home / ".rekordbox/master.db",
-    ]
-    for candidate in candidates:
+        return check_library_path(Path(override))
+    for candidate in default_library_paths():
         if candidate.exists():
-            return candidate
+            return check_library_path(candidate)
     raise FileNotFoundError(
         "Rekordbox master.db not found. Set SONGSWIPE_DB_PATH or install Rekordbox."
     )

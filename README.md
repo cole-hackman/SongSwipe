@@ -37,17 +37,21 @@ playlist — nothing is ever deleted from disk.
 
 ## Running it
 
-Requires Rekordbox 7 with your library on the same machine — SongSwipe
-reads and writes your real database and can't run without it. There is a
-packaged Windows installer (unsigned; SmartScreen will warn), or from
-source with Node and Python installed:
+Requires Rekordbox 7 with your library on the same machine. There is a
+packaged Windows installer (unsigned; SmartScreen will warn) that opens your
+real database, or from source with Node and Python installed:
 
     git clone https://github.com/cole-hackman/SongSwipe
     cd SongSwipe
     npm run setup   # installs JS deps and provisions the Python sidecar
-    npm run dev
+    SONGSWIPE_DB_PATH=/path/to/copy/master.db npm run dev
 
-`setup-mac.command` / `setup-windows.bat` do the same by double-click.
+`setup-mac.command` / `setup-windows.bat` run the setup by double-click.
+
+From source the app works on a copy of `master.db` and refuses the real
+library. To use the real library, set `SONGSWIPE_ALLOW_REAL=1` or start with
+`start-mac.command` / `start-windows.bat`, which set it for you.
+
 Tests: `npm run test:all` runs the vitest suite and the sidecar pytest
 suite.
 

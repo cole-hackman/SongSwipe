@@ -83,12 +83,24 @@ export function CommitDialog({ open, onClose }: CommitDialogProps) {
   }
 
   async function rollback(backupPath: string) {
-    if (!window.confirm('Restore this backup over master.db? Rekordbox must be closed.')) return
+    if (
+      !window.confirm(
+        'WARNING: this replaces the current master.db, so every change made after this backup is lost from the library. The current library is backed up first. Rekordbox must be closed.',
+      )
+    ) {
+      return
+    }
     setBusy(true)
     setStatus(null)
     try {
-      await rb('restore_backup', { backupPath })
-      setStatus(`Restored from ${backupPath}`)
+      const restored = await rb<{ previousBackupPath: string | null }>('restore_backup', {
+        backupPath,
+      })
+      setStatus(
+        restored.previousBackupPath
+          ? `Restored from ${backupPath}. Previous library saved to ${restored.previousBackupPath}`
+          : `Restored from ${backupPath}`,
+      )
       const next = await rb<BackupEntry[]>('list_backups')
       setBackups(next)
     } catch (error) {

@@ -42,7 +42,9 @@ export function registerIpcHandlers(): void {
     if (sidecarStatus.state === 'error') {
       throw new Error(sidecarStatus.error ?? 'Sidecar is not available')
     }
-    const result = await callSidecar(method, params)
+    // Restoring checks and copies the whole library, which can take a while.
+    const timeoutMs = method === 'restore_backup' ? 180_000 : undefined
+    const result = await callSidecar(method, params, timeoutMs)
     allowMediaPaths(trackPathsFromResult(method, result))
     return result
   })

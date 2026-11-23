@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(~/Library/Pioneer/**)",
+      "Edit(~/Library/Application Support/Pioneer/**)",
+      "Edit(~/Music/**)",
+      "Edit(//Volumes/**)",
+      "Bash(*Library/Pioneer*)",
+      "Bash(*Application Support/Pioneer*)",
+      "Bash(*Application\\ Support/Pioneer*)",
+      "Bash(*~/Music*)",
+      "Bash(*/Music/*)",
+      "Bash(*/Volumes/*)",
+      "Bash(*SONGSWIPE_ALLOW_REAL*)",
+      "Bash(*start-mac.command*)",
+      "Bash(*start-windows.bat*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git push * +*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -rf $HOME*)"
+    ]
+  }
+}

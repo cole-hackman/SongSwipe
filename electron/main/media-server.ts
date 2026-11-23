@@ -1,16 +1,25 @@
 import http from 'node:http'
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { createReadStream } from 'node:fs'
 import path from 'node:path'
 import { URL } from 'node:url'
+import { createSessionToken, isSessionToken, MediaLibrary } from './media-access'
 import { contentTypeForPath } from './media-types'
+
+// Pages loaded with loadFile() report one of these as their origin.
+const FILE_ORIGINS = ['file://', 'null']
 
 let server: http.Server | null = null
 let mediaPort: number | null = null
+let sessionToken = ''
+let appOrigins: string[] = FILE_ORIGINS
+const library = new MediaLibrary()
 
-function isSafeMediaPath(filePath: string): boolean {
-  if (!path.isAbsolute(filePath)) return false
-  if (filePath.includes('..')) return false
-  return existsSync(filePath)
+export function allowMediaPaths(filePaths: string[]): void {
+  for (const filePath of filePaths) library.add(filePath)
+}
+
+export function clearMediaPaths(): void {
+  library.clear()
 }
 
 function handleMediaRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -20,9 +29,20 @@ function handleMediaRequest(req: http.IncomingMessage, res: http.ServerResponse)
       return
     }
 
+    const origin = req.headers.origin
+    if (req.headers.host !== `127.0.0.1:${mediaPort}` || (origin && !appOrigins.includes(origin))) {
+      res.writeHead(403).end()
+      return
+    }
+
     const url = new URL(req.url || '/', 'http://127.0.0.1')
     if (url.pathname !== '/audio') {
       res.writeHead(404).end()
+      return
+    }
+
+    if (!isSessionToken(sessionToken, url.searchParams.get('t'))) {
+      res.writeHead(403).end()
       return
     }
 
@@ -32,21 +52,17 @@ function handleMediaRequest(req: http.IncomingMessage, res: http.ServerResponse)
       return
     }
 
-    const filePath = path.resolve(decodeURIComponent(rawPath))
-    if (!isSafeMediaPath(filePath)) {
+    const file = library.resolve(rawPath)
+    if (!file) {
       res.writeHead(404).end()
       return
     }
 
-    const stat = statSync(filePath)
-    if (!stat.isFile()) {
-      res.writeHead(404).end()
-      return
-    }
-
-    const fileSize = stat.size
+    const { path: filePath, size: fileSize } = file
     const contentType = contentTypeForPath(filePath)
-    const cors = { 'Access-Control-Allow-Origin': '*' }
+    const cors: Record<string, string> = origin
+      ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' }
+      : { Vary: 'Origin' }
 
     const rangeHeader = req.headers.range
     if (rangeHeader) {
@@ -100,12 +116,14 @@ export function toHttpMediaUrl(filePath: string): string {
     throw new Error('Media server is not running')
   }
   const absolute = path.resolve(filePath)
-  return `http://127.0.0.1:${mediaPort}/audio?p=${encodeURIComponent(absolute)}`
+  return `http://127.0.0.1:${mediaPort}/audio?t=${sessionToken}&p=${encodeURIComponent(absolute)}`
 }
 
-export async function ensureMediaServer(): Promise<number> {
+export async function ensureMediaServer(devServerUrl?: string): Promise<number> {
   if (mediaPort !== null) return mediaPort
 
+  sessionToken = createSessionToken()
+  appOrigins = devServerUrl ? [new URL(devServerUrl).origin] : FILE_ORIGINS
   server = http.createServer(handleMediaRequest)
   await new Promise<void>((resolve, reject) => {
     server!.once('error', reject)
@@ -126,4 +144,6 @@ export function stopMediaServer(): void {
   server.close()
   server = null
   mediaPort = null
+  sessionToken = ''
+  library.clear()
 }

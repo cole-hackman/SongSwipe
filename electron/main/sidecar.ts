@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { app } from 'electron'
+import { buildSidecarEnv } from './sidecar-env'
 import {
   describeMissingSidecarPath,
   normalizeSidecarCallFailure,
@@ -73,14 +74,6 @@ export function getSidecarDbPath(): string | null {
   return dbPathOverride
 }
 
-function sidecarEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env }
-  if (dbPathOverride) {
-    env.SONGSWIPE_DB_PATH = dbPathOverride
-  }
-  return env
-}
-
 export function restartSidecar(): void {
   stopSidecar()
   startSidecar()
@@ -120,7 +113,7 @@ export function startSidecar(): void {
 
   child = spawn(executable, args, {
     cwd,
-    env: sidecarEnv(),
+    env: buildSidecarEnv(process.env, { isPackaged: app.isPackaged, dbPath: dbPathOverride }),
     stdio: ['pipe', 'pipe', 'pipe'],
   })
 

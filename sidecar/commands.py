@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -12,9 +11,11 @@ from uuid import uuid4
 
 import psutil
 
+import library_files
 from beatgrid import beatgrid_from_content
 from duplicates import cluster_duplicates
 from rating import rating_from_db, rating_to_db
+from real_library import check_library_path, default_library_paths
 from xml_export import build_commit_xml
 
 try:
@@ -28,16 +29,10 @@ _db: Rekordbox6Database | None = None
 def _db_path() -> Path:
     override = os.environ.get("SONGSWIPE_DB_PATH")
     if override:
-        return Path(override)
-    home = Path.home()
-    candidates = [
-        home / "Library/Pioneer/rekordbox/master.db",
-        home / "AppData/Roaming/Pioneer/rekordbox/master.db",
-        home / ".rekordbox/master.db",
-    ]
-    for candidate in candidates:
+        return check_library_path(Path(override))
+    for candidate in default_library_paths():
         if candidate.exists():
-            return candidate
+            return check_library_path(candidate)
     raise FileNotFoundError(
         "Rekordbox master.db not found. Set SONGSWIPE_DB_PATH or install Rekordbox."
     )
@@ -106,63 +101,27 @@ def _iso_date(value: Any) -> str | None:
     return text or None
 
 
-def _copy_if_exists(src: Path, dest: Path) -> str | None:
-    if src.exists():
-        shutil.copy2(src, dest)
-        return str(dest)
-    return None
-
-
 def backup_db() -> dict[str, Any]:
     if is_rekordbox_running():
         raise RuntimeError("Close Rekordbox before backing up the library.")
-    path = _db_path()
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = path.with_name(f"master.db.songswipe-backup-{stamp}")
-    shutil.copy2(path, backup)
-    wal = _copy_if_exists(
-        path.with_name(f"{path.name}-wal"),
-        backup.with_name(f"{backup.name}-wal"),
-    )
-    shm = _copy_if_exists(
-        path.with_name(f"{path.name}-shm"),
-        backup.with_name(f"{backup.name}-shm"),
-    )
-    return {"backupPath": str(backup), "walPath": wal, "shmPath": shm}
+    return library_files.create_backup(_db_path())
 
 
 def list_backups() -> list[dict[str, str]]:
-    path = _db_path()
-    backups = sorted(path.parent.glob("master.db.songswipe-backup-*"), reverse=True)
-    result: list[dict[str, str]] = []
-    for backup in backups:
-        if backup.name.endswith("-wal") or backup.name.endswith("-shm"):
-            continue
-        result.append(
-            {
-                "path": str(backup),
-                "createdAt": datetime.fromtimestamp(backup.stat().st_mtime).isoformat(),
-            }
-        )
-    return result
+    return [
+        {
+            "path": str(backup),
+            "createdAt": datetime.fromtimestamp(backup.stat().st_mtime).isoformat(),
+        }
+        for backup in library_files.list_backup_files(_db_path())
+    ]
 
 
-def restore_backup(backup_path: str) -> dict[str, bool]:
+def restore_backup(backup_path: str) -> dict[str, Any]:
     if is_rekordbox_running():
         raise RuntimeError("Close Rekordbox before restoring the library.")
     close_db()
-    src = Path(backup_path)
-    if not src.exists():
-        raise FileNotFoundError(f"Backup not found: {backup_path}")
-    dest = _db_path()
-    shutil.copy2(src, dest)
-    wal_src = src.with_name(f"{src.name}-wal")
-    shm_src = src.with_name(f"{src.name}-shm")
-    if wal_src.exists():
-        shutil.copy2(wal_src, dest.with_name(f"{dest.name}-wal"))
-    if shm_src.exists():
-        shutil.copy2(shm_src, dest.with_name(f"{dest.name}-shm"))
-    return {"ok": True}
+    return library_files.restore(_db_path(), backup_path)
 
 
 def _playlist_sort_order(db: Rekordbox6Database) -> dict[str, int]:

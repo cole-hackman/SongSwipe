@@ -1,9 +1,15 @@
-import { ensureMediaServer, toHttpMediaUrl, stopMediaServer } from '../electron/main/media-server.ts'
+import {
+  allowMediaPaths,
+  ensureMediaServer,
+  stopMediaServer,
+  toHttpMediaUrl,
+} from '../electron/main/media-server.ts'
 
 async function main() {
+  const file = process.argv[2]
+  if (!file) throw new Error('Usage: npx tsx scripts/test-media-server.mts <audio file>')
   await ensureMediaServer()
-  const file =
-    '/Volumes/HACKMAN SSD/Tracks/64. Dom Dolla, Daya, Eli Brown - Dreamin (Eli Brown Extended Remix).mp3'
+  allowMediaPaths([file])
   const url = toHttpMediaUrl(file)
   console.log('url', url)
   const res = await fetch(url, { headers: { Range: 'bytes=0-1023' } })

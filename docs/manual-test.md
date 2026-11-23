@@ -1,17 +1,17 @@
 # SongSwipe manual smoke test
 
-Run these after `npm run dev`. **Fully quit and restart Electron** after any change to `electron/main/` (media protocol, sidecar).
+Run these after `SONGSWIPE_DB_PATH=/path/to/copy/master.db npm run dev`. **Fully quit and restart Electron** after any change to `electron/main/` (media protocol, sidecar).
 
 ## 0. Preconditions
 
 - Rekordbox 7 installed; quit Rekordbox while testing (unlocks `master.db`).
 - Python sidecar: `.venv/bin/pip install -r sidecar/requirements.txt`
-- Optional: clear custom DB path in **Library** settings unless you intentionally use a copy.
+- Test on a copy of `master.db`. The real library is refused unless `SONGSWIPE_ALLOW_REAL=1` is set.
 
 ## 1. Sidecar (terminal)
 
 ```bash
-cd /Users/coleh/Desktop/SongSwipe
+export SONGSWIPE_DB_PATH=/path/to/copy/master.db
 echo '{"id":1,"method":"ping","params":{}}' | .venv/bin/python sidecar/rb_bridge.py
 echo '{"id":2,"method":"get_playlists","params":{}}' | .venv/bin/python sidecar/rb_bridge.py | head -c 400
 ```
@@ -53,14 +53,7 @@ Verify the media server can read your file (Terminal):
 ```bash
 # After app is running, check Electron terminal for: [media-server] listening on 127.0.0.1:XXXX
 # Or run this standalone test:
-npx tsx -e "
-import { ensureMediaServer, toHttpMediaUrl, stopMediaServer } from './electron/main/media-server.ts';
-await ensureMediaServer();
-const url = toHttpMediaUrl('/Volumes/HACKMAN SSD/Tracks/your-track.mp3');
-const res = await fetch(url, { headers: { Range: 'bytes=0-3' } });
-console.log(res.status, await res.arrayBuffer());
-stopMediaServer();
-"
+npx tsx scripts/test-media-server.mts /path/to/your-track.mp3
 ```
 
 Expect status `206` and MP3 bytes (often starts with `ID3` or `0xff`).

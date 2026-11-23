@@ -60,7 +60,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  await ensureMediaServer()
+  await ensureMediaServer(VITE_DEV_SERVER_URL)
   registerIpcHandlers()
   await loadPersistedSettings()
   await ensureSidecarReady()

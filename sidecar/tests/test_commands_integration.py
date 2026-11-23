@@ -7,12 +7,12 @@ import commands
 
 
 @pytest.mark.integration
-def test_integration_read_and_write_requires_fixture_db():
+def test_integration_read_and_write_requires_fixture_db(monkeypatch):
     db_path = os.environ.get("SONGSWIPE_TEST_DB")
     if not db_path:
         pytest.skip("SONGSWIPE_TEST_DB not set")
 
-    os.environ["SONGSWIPE_DB_PATH"] = db_path
+    monkeypatch.setenv("SONGSWIPE_DB_PATH", db_path)
     commands.close_db()
 
     playlists = commands.get_playlists()
